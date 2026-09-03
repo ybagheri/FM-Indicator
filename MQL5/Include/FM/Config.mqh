@@ -76,6 +76,15 @@ public:
       SwingK=2; MinLegATRMult=0.75; MMToleranceATRMult=0.35; ApproachATRMult=1.5;
       MinBodyRatio=0.25; RequireFollowThrough=false;
      }
+   // M1 scalp: looser legs/tolerance for noisy intraday, fewer bars back.
+   void SetM1Scalp()
+     {
+      SetBalanced();
+      SwingK=2; MinLegATRMult=0.75; MinLegBars=2; MaxPullbackBars=30;
+      MMToleranceATRMult=0.35; ApproachATRMult=1.5; MaxOvershootATRMult=0.60;
+      MinBodyRatio=0.25; MaxWickRatio=0.70; RequireFollowThrough=false;
+      MaxBarsForward=60;
+     }
    // Clamp nonsense; returns false if anything was clamped.
    bool Validate()
      {

@@ -41,6 +41,11 @@ body ≥30%, adverse wick ≤60%, engulf/follow-through optional. Presets:
 - Gray trend = Leg1 (A0→A1), silver = pullback (A1→B0), dashed H-line = target.
 - Blue = POTENTIAL (approaching), orange = DEVELOPING (touch + exhaustion),
   lime = CONFIRMED (reversal bar). Label shows `#id + target`.
+- Labels now carry explicit fade direction: `SELL` = fade a bull MM (short),
+  `BUY` = fade a bear MM (long); DEVELOPING/CONFIRMED also draw a red/green
+  arrow at the signal bar. Close targets stagger vertically so they stay readable.
+- Presets in `Presets/`: Balanced, Conservative, Aggressive, **M1-Scalp**
+  (for noisy M1 like EURUSD). Load via indicator Inputs → Load.
 - Toggles: `InpShowLegs/Pullbacks/Targets/Zones`. Objects named `FM_<id>_*`,
   auto-deleted on invalidation/expiry/symbol-timeframe change.
 - EA use: DATA buffers `Target/Potential/Developing/Confirmed` (frozen after

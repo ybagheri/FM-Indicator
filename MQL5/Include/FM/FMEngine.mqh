@@ -29,12 +29,13 @@ public:
    ENUM_FM_CONTEXT   context;
    double            confidence;
    int               state_bar_age; // bars since last transition (for follow-through)
+   datetime          signal_time;   // bar time of last transition (for BUY/SELL arrows)
 
    CFMSetup(): id(0), family(MM_REGULAR), dir(0), mm_range(0), target(0),
                state(FM_PROJECTED), bars_since_creation(0), created_time(0),
                created_shift_anchor(0), alerted_potential(false),
                alerted_developing(false), alerted_confirmed(false),
-               context(FM_CTX_TRANSITION), confidence(0.5), state_bar_age(0) {}
+               context(FM_CTX_TRANSITION), confidence(0.5), state_bar_age(0), signal_time(0) {}
   };
 
 class CFMEngine
@@ -174,13 +175,13 @@ public:
             {
              case FM_PROJECTED:
                 if(!veto && dist >= 0 && dist <= approach)
-                  { m_setups[i].state=FM_POTENTIAL; m_setups[i].state_bar_age=0; }
+                  { m_setups[i].state=FM_POTENTIAL; m_setups[i].state_bar_age=0; m_setups[i].signal_time=rates[b].time; }
                 break;
              case FM_POTENTIAL:
                 if(MathAbs(extreme - m_setups[i].target) <= tol)
                   {
                    if(CConfirmation::ExhaustionAny(rates, count, b, m_setups[i].dir, a))
-                     { m_setups[i].state=FM_DEVELOPING; m_setups[i].state_bar_age=0; }
+                     { m_setups[i].state=FM_DEVELOPING; m_setups[i].state_bar_age=0; m_setups[i].signal_time=rates[b].time; }
                   }
                 else if(dist < 0 || dist > approach + tol)
                   {
@@ -208,7 +209,7 @@ public:
                      {
                       if(cfg.ContextFilter==CTX_DEMOTE && cf < 0.5)
                         { /* stay DEVELOPING */ }
-                      else { m_setups[i].state=FM_CONFIRMED; m_setups[i].state_bar_age=0; }
+                      else { m_setups[i].state=FM_CONFIRMED; m_setups[i].state_bar_age=0; m_setups[i].signal_time=rates[b].time; }
                      }
                   }
                 // delayed follow-through: if previous bar was signal and current confirms
@@ -218,12 +219,12 @@ public:
                       CConfirmation::FollowThrough(rates, count, b+1, f))
                      {
                       double pe = (m_setups[i].dir>0)? rates[b+1].high : rates[b+1].low;
-                      if(MathAbs(pe - m_setups[i].target) <= 2*tol) { m_setups[i].state=FM_CONFIRMED; m_setups[i].state_bar_age=0; }
+                      if(MathAbs(pe - m_setups[i].target) <= 2*tol) { m_setups[i].state=FM_CONFIRMED; m_setups[i].state_bar_age=0; m_setups[i].signal_time=rates[b].time; }
                      }
                   }
                 // lost zone → back to POTENTIAL
                 if(m_setups[i].state==FM_DEVELOPING && MathAbs(extreme - m_setups[i].target) > tol + approach)
-                  { m_setups[i].state=FM_POTENTIAL; m_setups[i].state_bar_age=0; }
+                  { m_setups[i].state=FM_POTENTIAL; m_setups[i].state_bar_age=0; m_setups[i].signal_time=rates[b].time; }
                 break;
                }
              case FM_CONFIRMED:

@@ -242,13 +242,13 @@ int OnCalculate(const int rates_total,
             if(s.state==FM_CONFIRMED || s.state==FM_DEVELOPING || s.state==FM_POTENTIAL)
               {
                if(g_engine.ClaimAlert(s.id, s.state))
-                  g_alerts.Dispatch(g_cfg, s.id, s.state, _Symbol, (ENUM_TIMEFRAMES)_Period, px, s.target);
+                  g_alerts.Dispatch(g_cfg, s.id, s.state, s.dir, _Symbol, (ENUM_TIMEFRAMES)_Period, px, s.target);
               }
            }
          if(s.state==FM_PROJECTED || s.state==FM_POTENTIAL || s.state==FM_DEVELOPING)
             if(BufTarget[1]==EMPTY_VALUE) BufTarget[1]=s.target;
         }
-      g_viz.Sync(rates, rates_total, g_engine, g_cfg);
+      g_viz.Sync(rates, rates_total, g_engine, g_cfg, g_atr.At(1));
       g_first_run=false;
       return(rates_total);
      }

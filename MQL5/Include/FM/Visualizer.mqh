@@ -1,5 +1,7 @@
 //+------------------------------------------------------------------+
 //| Visualizer.mqh : FM_<id>_* object lifecycle                        |
+//| Labels carry explicit fade direction (BUY/SELL); staggered to      |
+//| avoid overlap when targets cluster. Arrows mark signal bar.        |
 //+------------------------------------------------------------------+
 #ifndef FM_VISUALIZER_MQH
 #define FM_VISUALIZER_MQH
@@ -36,13 +38,29 @@ private:
       ObjectSetString(0, name, OBJPROP_TEXT, text);
       ObjectSetInteger(0, name, OBJPROP_COLOR, c);
       ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 8);
+      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT);
+      ObjectMove(0, name, 0, t, price);
+     }
+   void EnsureArrow(string name, datetime t, double price, bool is_buy)
+     {
+      ENUM_OBJECT type = (is_buy ? OBJ_ARROW_BUY : OBJ_ARROW_SELL);
+      if(ObjectFind(0, name) < 0) ObjectCreate(0, name, type, 0, t, price);
+      ObjectSetInteger(0, name, OBJPROP_COLOR, (is_buy ? clrLime : clrRed));
+      ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
       ObjectMove(0, name, 0, t, price);
      }
 
 public:
-   void Sync(const MqlRates &rates[], int count, CFMEngine &engine, const CFMConfig &cfg)
+   // atr_ref: current ATR for label stagger separation (≈0.15×ATR).
+   void Sync(const MqlRates &rates[], int count, CFMEngine &engine, const CFMConfig &cfg, double atr_ref)
      {
-      // index desired ids
+      double pt = _Point;
+      if(pt <= 0) pt = 0.00001;
+      double sep = atr_ref * 0.15;
+      if(sep <= 0) sep = pt * 100; // fallback ≈10 pips on 5-digit FX
+      double placed[];
+      ArrayResize(placed, 0);
+
       for(int i = 0; i < engine.ActiveCount(); i++)
         {
          CFMSetup s;
@@ -60,7 +78,6 @@ public:
          if(cfg.ShowZones)
            {
             string zname = px+"ZONE";
-            // zone = rectangle target±tol between B0 time and now
             if(ObjectFind(0, zname) < 0)
                ObjectCreate(0, zname, OBJ_RECTANGLE, 0, tB0, s.target, TimeCurrent(), s.target);
             ObjectSetInteger(0, zname, OBJPROP_COLOR, tgtColor);
@@ -68,19 +85,43 @@ public:
             ObjectSetInteger(0, zname, OBJPROP_BACK, true);
             ObjectMove(0, zname, 1, TimeCurrent(), s.target);
            }
-         string st = (s.state==FM_PROJECTED?"MM":(s.state==FM_POTENTIAL?"POTENTIAL":(s.state==FM_DEVELOPING?"DEVELOPING":(s.state==FM_CONFIRMED?"CONFIRMED ✓":"DONE"))));
+         // Explicit fade direction: bull MM fades SHORT, bear MM fades LONG.
+         string side = (s.dir > 0 ? "SELL" : "BUY");
+         string st = (s.state==FM_PROJECTED?"MM":(s.state==FM_POTENTIAL?"POTENTIAL":(s.state==FM_DEVELOPING?"DEVELOPING":(s.state==FM_CONFIRMED?"CONFIRMED":"DONE"))));
          string fam = (s.family==MM_INVERSE?"INV ":"");
-         EnsureLabel(px+"LABEL", TimeCurrent(), s.target,
-                     StringFormat("%s%s #%d T=%.5f", fam, st, (int)s.id, s.target), tgtColor);
-         // state glyph at confirmation: arrow object on B0 bar handled via buffer; label suffices
+         // Stagger label price when targets cluster (your EURUSD #1/#2 case).
+         double lp = s.target;
+         for(int guard = 0; guard < 10; guard++)
+           {
+            bool clash = false;
+            for(int k = 0; k < ArraySize(placed); k++)
+               if(MathAbs(lp - placed[k]) < sep) { clash = true; break; }
+            if(!clash) break;
+            lp += sep;
+           }
+         int np = ArraySize(placed);
+         ArrayResize(placed, np+1);
+         placed[np] = lp;
+         EnsureLabel(px+"LABEL", TimeCurrent(), lp,
+                     StringFormat("%s%s %s #%d T=%.5f", fam, st, side, (int)s.id, s.target), tgtColor);
+         // Directional arrow at the signal bar for DEVELOPING/CONFIRMED/COMPLETED.
+         if(s.state==FM_DEVELOPING || s.state==FM_CONFIRMED || s.state==FM_COMPLETED)
+           {
+            if(s.signal_time > 0)
+               EnsureArrow(px+"ARROW", s.signal_time, s.target, (s.dir < 0));
+           }
+         else
+           {
+            if(ObjectFind(0, px+"ARROW") >= 0) ObjectDelete(0, px+"ARROW");
+           }
         }
      }
 
    void DeleteSetup(long id)
      {
       string px = Prefix(id);
-      string names[5] = {px+"LEG", px+"PB", px+"TGT", px+"ZONE", px+"LABEL"};
-      for(int i=0;i<5;i++) if(ObjectFind(0, names[i])>=0) ObjectDelete(0, names[i]);
+      string names[6] = {px+"LEG", px+"PB", px+"TGT", px+"ZONE", px+"LABEL", px+"ARROW"};
+      for(int i=0;i<6;i++) if(ObjectFind(0, names[i])>=0) ObjectDelete(0, names[i]);
      }
 
    void DeleteAll()

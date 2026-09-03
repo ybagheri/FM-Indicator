@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+# user chart screenshots: never commit/push
+*.png
+*.jpg
+Screenshot*/
+Screenshots/
