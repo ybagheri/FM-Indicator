@@ -40,6 +40,7 @@
 #include <FM/MarketState.mqh>
 #include <FM/BreakoutEngine.mqh>
 #include <FM/ReversalEngine.mqh>
+#include <FM/SetupEngine.mqh>
 #include <FM/MeasuredMove.mqh>
 #include <FM/FMEngine.mqh>
 #include <FM/Visualizer.mqh>
@@ -94,6 +95,9 @@ input int    InpRevLookback         = 10;    // Phase 5: MTR cross/retest window
 input double InpRevRetestTolATRMult = 0.25;  // Phase 5: EMA touch band (xATR)
 input int    InpRevMinPressure      = 5;     // Phase 5: pushes for MTR pressure leg
 input bool   InpEnableReversal      = true;  // Phase 5: reversal engine (read-only)
+input double InpSetupStopBufATRMult = 0.10;  // Phase 6: stop buffer beyond structure (xATR)
+input double InpSetupMinRR          = 1.0;   // Phase 6: R flag threshold (report-only)
+input bool   InpEnableSetup         = true;  // Phase 6: FM setup plans (read-only)
 input int    InpMTFTrendTFMinutes   = 0;      // v2 MTF overlay: 0=off, else higher-TF minutes
 input bool   InpExportCSV           = false;  // v2: write signals CSV on new CONFIRMED
 input string InpCSVFile             = "FM_signals.csv";
@@ -172,6 +176,9 @@ void ApplyInputsToConfig()
    g_cfg.RevRetestTolATRMult=InpRevRetestTolATRMult;
    g_cfg.RevMinPressure=InpRevMinPressure;
    g_cfg.EnableReversal=InpEnableReversal;
+   g_cfg.SetupStopBufATRMult=InpSetupStopBufATRMult;
+   g_cfg.SetupMinRR=InpSetupMinRR;
+   g_cfg.EnableSetup=InpEnableSetup;
    g_cfg.ContextFilter=InpContextFilterMode;
    g_cfg.PriceMode=InpPriceMode;
    g_cfg.MaxActiveSetups=InpMaxActiveSetups; g_cfg.MaxBarsForward=InpMaxBarsForward;
@@ -366,6 +373,22 @@ int OnCalculate(const int rates_total,
           LegCount lgS = CLegCounter::CountBear(sw);
           if(lgB.valid && lgB.legs > 0) g_log.Debug(CLegCounter::Describe(lgB, +1));
           if(lgS.valid && lgS.legs > 0) g_log.Debug(CLegCounter::Describe(lgS, -1));
+         }
+       // Phase 6 FM setup plans (read-only; never gates the state machine).
+       if(g_cfg.EnableSetup)
+         {
+          for(int i=0;i<g_engine.ActiveCount();i++)
+            {
+             CFMSetup s; if(!g_engine.GetSetup(i,s)) continue;
+             if(s.state!=FM_DEVELOPING && s.state!=FM_CONFIRMED) continue;
+             int sh=-1;
+             for(int k=1;k<rates_total;k++)
+               if(rates[k].time==s.signal_time) { sh=k; break; }
+             if(sh<1) continue;
+             SetupPlan pl=CSetupPlanner::Plan(rates[sh],s.dir,s.target,s.b0.price,
+                g_atr.At(1),g_cfg,s.id,s.family,s.state==FM_CONFIRMED,sh);
+             if(pl.valid) g_log.Debug(CSetupPlanner::Describe(pl));
+            }
          }
       // v2 MTF overlay (read-only annotation; never gates the state machine).
       if(InpMTFTrendTFMinutes > 0)

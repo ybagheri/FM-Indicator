@@ -67,6 +67,10 @@ public:
     double            RevRetestTolATRMult;
     int               RevMinPressure;
     bool              EnableReversal;     // master switch; false = layer idle
+    // Phase 6 FM setup plans (docs/SETUP_ENGINE.md §1)
+    double            SetupStopBufATRMult;
+    double            SetupMinRR;
+    bool              EnableSetup;        // master switch; false = layer idle
    ENUM_CTX_FILTER   ContextFilter;
    ENUM_FM_PRICE_MODE PriceMode;   // HIGHLOW = candles, CLOSE = line chart
    int               MaxActiveSetups;
@@ -113,6 +117,7 @@ public:
        BOTrapLookback=20; EnableBreakout=true;
        RevLookback=10; RevRetestTolATRMult=0.25; RevMinPressure=5;
        EnableReversal=true;
+       SetupStopBufATRMult=0.10; SetupMinRR=1.0; EnableSetup=true;
       ContextFilter=CTX_LOG_ONLY; PriceMode=FM_PRICE_HIGHLOW;
       MaxActiveSetups=20; MaxBarsForward=100;
       UseIntrabarPotential=false; AtrPeriod=14;
@@ -204,6 +209,10 @@ public:
        if(RevRetestTolATRMult>1.0) { RevRetestTolATRMult=1.0; ok=false; }
        if(RevMinPressure<3) { RevMinPressure=3; ok=false; }
        if(RevMinPressure>10) { RevMinPressure=10; ok=false; }
+       if(SetupStopBufATRMult<0.0) { SetupStopBufATRMult=0.0; ok=false; }
+       if(SetupStopBufATRMult>1.0) { SetupStopBufATRMult=1.0; ok=false; }
+       if(SetupMinRR<0.25) { SetupMinRR=0.25; ok=false; }
+       if(SetupMinRR>5.0) { SetupMinRR=5.0; ok=false; }
        return ok;
      }
   };

@@ -52,6 +52,9 @@ Phase-5 reversal engine (read-only): per-bar exhaustion breadth
 (climax/stall/pushes/wedge/overshoot) + pullback leg counting + EMA-cross
 MTR proxy (MINOR/MAJOR, unit weights), DEBUG-logged when found, never
 gating signals — see `docs/REVERSAL_ENGINE.md`.
+Phase-6 setup plans (read-only): per DEVELOPING/CONFIRMED setup entry /
+stop / objective / R + invalidation price, DEBUG-logged when valid, never
+gating signals — see `docs/SETUP_ENGINE.md`.
 **Price mode** `InpPriceMode`: `High/Low` (candles, default) or `Close`
 (line chart — swings/legs/targets/distances on closes, like mobile
 line-chart MM analysis). Families v1.2 (default OFF): `InpEnableRangeMM` /
@@ -112,6 +115,7 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 `docs/MARKET_STATE.md` ·
 `docs/BREAKOUT_ENGINE.md` ·
 `docs/REVERSAL_ENGINE.md` ·
+`docs/SETUP_ENGINE.md` ·
 `docs/MARKET_CONTEXT.md` ·
 `docs/SYSTEMATIC_SPECIFICATION.md` ·
 `docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/FUTURE_ROADMAP.md`

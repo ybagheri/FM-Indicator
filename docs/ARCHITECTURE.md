@@ -13,6 +13,7 @@ MQL5/Include/FM/
    MarketState.mqh   CMarketState (Phase 3: TREND/CHANNEL/RANGE/BOM scores + Describe, read-only)
    BreakoutEngine.mqh CBreakoutEngine (Phase 4: BO events + FOLLOW/FAILED + trap flag, read-only)
    ReversalEngine.mqh CExhaustionAnalyzer + CLegCounter + CMajorReversal (Phase 5: exhaustion + legs + MTR proxy, read-only)
+   SetupEngine.mqh   CSetupPlanner (Phase 6: FM entry/stop/objective/R plans, read-only)
   Swings.mqh        CSwingDetector (fractal-k, confirmed-only output)
   Context.mqh       CContextClassifier (Trend/Range/Transition + confidence)
   MeasuredMove.mqh  CLeg, CMeasuredMove (regular + inverse projection)
@@ -36,6 +37,7 @@ rates[] → CMarketData.Refresh (new-bar detect, freeze closes)
    → CMarketState.Analyze (Phase 3 read-only DEBUG log: 6 state scores/pcts)
    → CBreakoutEngine.Analyze (Phase 4 read-only DEBUG log when found)
    → CExhaustionAnalyzer/CLegCounter/CMajorReversal (Phase 5 read-only DEBUG log when found)
+   → CSetupPlanner.Plan per DEVELOPING/CONFIRMED setup (Phase 6 read-only DEBUG log when valid)
    → CSwingDetector.Update (confirmed swings only)
   → CMeasuredMove.Project (legs → projections, inverse if enabled)
   → CContextClassifier.Update → CConfirmation.Evaluate
@@ -74,6 +76,10 @@ Tick with no new closed bar: only optional intrabar POTENTIAL preview
   depth/deep flag) + `Analyze` (EMA-cross + retest + Phase-4 FOLLOW +
   pressure → MINOR/MAJOR, unit weights) + `Describe()`s; v1
   `CConfirmation` untouched (Phase 5, read-only).
+- `CSetupPlanner`: static pure `Plan` (signal-bar extreme → entry; stop
+  beyond signal extreme AND target zone + ATR buffer; B0 objective; R +
+  report-only `rrOK`; invalidation close echo) + `Describe()`; reads
+  `CFMSetup` snapshots, writes nothing (Phase 6, read-only).
 - `CSwingDetector`: `AddBar()`; outputs `Swing{index, price, dir, confirmed_bar}`.
   Internal pending buffer of size k; never exposes unconfirmed.
 - `CMeasuredMove : CMeasuredMoveBase` with subclasses

@@ -1,4 +1,4 @@
-# TESTING — FM Indicator v1.2 + v2 research + Phase-1..5 engines
+# TESTING — FM Indicator v1.2 + v2 research + Phase-1..6 engines
 
 ## Method
 
@@ -9,11 +9,13 @@
 - State oracle: `tests/market_state.py` (1:1 mirror of MARKET_STATE.md).
 - Breakout oracle: `tests/breakout.py` (1:1 mirror of BREAKOUT_ENGINE.md).
 - Reversal oracle: `tests/reversal.py` (1:1 mirror of REVERSAL_ENGINE.md).
-- Run: `python3 -m pytest tests/ -q` → 64 tests, ALL PASS (19 FM + 7 bar +
-  10 pullback + 9 state + 9 breakout + 10 reversal; or per-file via `__main__`).
+- Setup oracle: `tests/setup_engine.py` (1:1 mirror of SETUP_ENGINE.md).
+- Run: `python3 -m pytest tests/ -q` → 74 tests, ALL PASS (19 FM + 7 bar +
+  10 pullback + 9 state + 9 breakout + 10 reversal + 10 setup;
+  or per-file via `__main__`).
 - MQL5 compile: MetaEditor on Windows (F7). Linux env has no
   `metaeditor.exe`/`wine`; static check = balanced-delimiter scan
-  (comment/string-stripped) over all 18 MQL5 files → OK.
+  (comment/string-stripped) over all 19 MQL5 files → OK.
 
 ## Cases → expected
 
@@ -76,6 +78,16 @@
 | 55 | MTR MAJOR (all four legs) | MAJOR, score 100, BO FOLLOW + pressure | PASS |
 | 56 | MTR MINOR (partial legs) | MINOR, score 50, EMA + retest only | PASS |
 | 57 | Reversal freeze + safety | identical after extension; zero-ATR/tiny/disabled safe | PASS |
+| 58 | Sell plan geometry | entry/stop/obj/R exact, RRok, firm | PASS |
+| 59 | Buy plan mirror | entry/stop/obj/R exact, invalidClose echo | PASS |
+| 60 | Stop on signal extreme | structure = signal extreme + buffer | PASS |
+| 61 | Stop on target zone | structure = T+tol + buffer | PASS |
+| 62 | Objective beyond entry | reward ≤0 → invalid | PASS |
+| 63 | Zero risk (flat, no buffer) | risk 0 → invalid | PASS |
+| 64 | MinRR threshold | RRok above, RRlow below | PASS |
+| 65 | Provisional + families | DEVELOPING prov; all 5 families pass through | PASS |
+| 66 | InvalidClose + safety | ±over echo; disabled/zero-ATR/bad-dir safe | PASS |
+| 67 | Plan determinism | identical re-run | PASS |
 
 ## Coverage map (prompt §TESTING 1–12 + v1.2/v2)
 
@@ -115,6 +127,12 @@ bull legs 1→2+deep (depth 0.5/0.8) + empty/no-anchor cases; bear mirror;
 MTR MAJOR (EMA-cross + retest + Phase-4 FOLLOW + pressure, score 100);
 MTR MINOR (EMA + retest only, score 50);
 NONE/freeze/no-look-ahead/zero-ATR/tiny-history/disabled safety.
+Phase 6 setup plans (`test_setup.py`, 10 suites): sell geometry exact
+(entry/stop/objective/R/invalidClose); buy mirror; stop anchored on signal
+extreme vs on target zone; invalid on objective-beyond-entry and on zero
+risk; MinRR flag both sides; provisional flag + all-five-family
+passthrough; invalidClose echo + disabled/zero-ATR/bad-dir safety;
+determinism.
 
 ## Reproduce
 
