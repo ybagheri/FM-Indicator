@@ -1,15 +1,16 @@
-# TESTING — FM Indicator v1.2 + v2 research + Phase-1 bar engine
+# TESTING — FM Indicator v1.2 + v2 research + Phase-1 bar engine + Phase-2 pullbacks
 
 ## Method
 
 - Oracle: `tests/fm_engine.py` (1:1 mirror of SPEC). MQL5 must match it on
   identical synthetic series.
 - Bar oracle: `tests/bar_analyzer.py` (1:1 mirror of BAR_BY_BAR_ENGINE.md).
-- Run: `python3 -m pytest tests/ -q` → 26 tests, ALL PASS (19 FM + 7 bar;
-  or `python3 tests/test_fm.py` / `python3 tests/test_bar.py` via `__main__`).
+- Pullback oracle: `tests/pullback_patterns.py` (1:1 mirror of PULLBACK_PATTERNS.md).
+- Run: `python3 -m pytest tests/ -q` → 36 tests, ALL PASS (19 FM + 7 bar + 10 pullback;
+  or `python3 tests/test_fm.py` / `python3 tests/test_bar.py` / `python3 tests/test_pullback.py` via `__main__`).
 - MQL5 compile: MetaEditor on Windows (F7). Linux env has no
   `metaeditor.exe`/`wine`; static check = balanced-delimiter scan
-  (comment/string-stripped) over all 13 MQL5 files → OK.
+  (comment/string-stripped) over all 15 MQL5 files → OK.
 
 ## Cases → expected
 
@@ -34,6 +35,16 @@
 | 17 | MTF bias + MAE/MFE | +1/−1/0; MAE/MFE exact | PASS |
 | 18 | CSV export + backtest harness | no crash, schema valid | PASS |
 | 19 | Exhaustion cfg variants | zero ATR never exhausts | PASS |
+| 20 | H1→H2 two-leg (bull gate) | legs==2, signal/anchor/ref/stop exact | PASS |
+| 21 | H1-only, no second leg | legs==1, signal==anchor | PASS |
+| 22 | L1/L2 mirror (bear gate) | legs==2; bull side silent | PASS |
+| 23 | Gate 0 (sideways) | no pullback signals either side | PASS |
+| 24 | Chop with gate forced | H1-only fires → documents H1-alone risk | PASS |
+| 25 | Swing double-top in tol | found, most-recent pair wins | PASS |
+| 26 | Swing double-top rejected | out-of-tol / shallow-trough / too-far → none | PASS |
+| 27 | Double-bottom mirror | found; no-trough variant silent | PASS |
+| 28 | Micro double (top+bottom) | found micro:true; shallow dip rejected | PASS |
+| 29 | Freeze + no-look-ahead + safety | identical after extension; zero-ATR/tiny-history safe | PASS |
 
 ## Coverage map (prompt §TESTING 1–12 + v1.2/v2)
 
@@ -52,6 +63,11 @@ v2 — MTF/MAE/MFE/CSV/backtest (17–18).
 Phase 1 bar engine (`test_bar.py`, 7 suites): strong/doji geometry + doji
 run-reset; inside/outside/ii; overlap/barbwire/tightening; gap parity with
 `CGapMM`; runs + pressure counters; freeze/no-look-ahead/tiny-history/zero-ATR.
+Phase 2 pullbacks (`test_pullback.py`, 10 suites): H1→H2 two-leg; H1-only;
+L1/L2 mirror + bull-side silence; gate-0 suppression; chop-with-gate-forced
+(H1-alone risk record); swing double-top in-tol (most-recent wins) + rejected
+(tol/trough/distance); double-bottom mirror; micro top+bottom (halved trough);
+freeze/no-look-ahead/zero-ATR/tiny-history safety.
 
 ## Reproduce
 

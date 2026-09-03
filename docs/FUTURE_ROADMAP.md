@@ -35,7 +35,8 @@
 - Optimization framework + walk-forward analysis.
 
 ## Phases 2–8 (bar-by-bar expansion, planned)
-- Phase 2: H1/H2/L1/L2 pullback counter + doubles (DT/DB) on confirmed swings.
+- [x] Phase 2: H1/H2/L1/L2 pullback counter + doubles (DT/DB) on confirmed swings
+  (`PULLBACK_PATTERNS.md` + `PullbackPatterns.mqh` + mirror + 10 tests, read-only hook).
 - Phase 3: market-state engine (TREND/CHANNEL/RANGE/BREAKOUT_MODE scores).
 - Phase 4: breakout + generalized failed-breakout/trap engine.
 - Phase 5: pullback/reversal/MTR + dedicated exhaustion analyzer.

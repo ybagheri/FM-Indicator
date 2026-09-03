@@ -36,6 +36,7 @@
 #include <FM/ATR.mqh>
 #include <FM/Swings.mqh>
 #include <FM/BarAnalyzer.mqh>
+#include <FM/PullbackPatterns.mqh>
 #include <FM/MeasuredMove.mqh>
 #include <FM/FMEngine.mqh>
 #include <FM/Visualizer.mqh>
@@ -72,6 +73,12 @@ input double InpBigBarATRMult       = 2.0;    // Phase 1: big-bar threshold
 input double InpSmallBarATRMult     = 0.5;    // Phase 1: small-bar threshold
 input double InpStrongClosePct      = 0.70;   // Phase 1: strong-close threshold
 input bool   InpEnableBarAnalysis   = true;   // Phase 1: bar-by-bar analyzer (read-only)
+input double InpMinPullbackDepthATRMult = 0.50; // Phase 2: pullback window range gate (xATR)
+input double InpDoubleTopTolATRMult  = 0.25;  // Phase 2: double-top/bottom tolerance (xATR)
+input int    InpMaxDoubleBars        = 20;    // Phase 2: max bars between double extremes
+input double InpMinDoubleTroughATRMult = 0.50; // Phase 2: min trough separation (xATR)
+input int    InpMicroDoubleBars      = 5;     // Phase 2: micro-double window (newest closed bars)
+input bool   InpEnablePullbackPatterns = true; // Phase 2: pullback/double layer (read-only)
 input int    InpMTFTrendTFMinutes   = 0;      // v2 MTF overlay: 0=off, else higher-TF minutes
 input bool   InpExportCSV           = false;  // v2: write signals CSV on new CONFIRMED
 input string InpCSVFile             = "FM_signals.csv";
@@ -135,6 +142,12 @@ void ApplyInputsToConfig()
    g_cfg.DojiMaxBodyRatio=InpDojiMaxBodyRatio; g_cfg.BigBarATRMult=InpBigBarATRMult;
    g_cfg.SmallBarATRMult=InpSmallBarATRMult; g_cfg.StrongClosePct=InpStrongClosePct;
    g_cfg.EnableBarAnalysis=InpEnableBarAnalysis;
+   g_cfg.MinPullbackDepthATRMult=InpMinPullbackDepthATRMult;
+   g_cfg.DoubleTopTolATRMult=InpDoubleTopTolATRMult;
+   g_cfg.MaxDoubleBars=InpMaxDoubleBars;
+   g_cfg.MinDoubleTroughATRMult=InpMinDoubleTroughATRMult;
+   g_cfg.MicroDoubleBars=InpMicroDoubleBars;
+   g_cfg.EnablePullbackPatterns=InpEnablePullbackPatterns;
    g_cfg.ContextFilter=InpContextFilterMode;
    g_cfg.PriceMode=InpPriceMode;
    g_cfg.MaxActiveSetups=InpMaxActiveSetups; g_cfg.MaxBarsForward=InpMaxBarsForward;
@@ -271,12 +284,37 @@ int OnCalculate(const int rates_total,
 
       g_engine.FormProjections(sw, rates, rates_total, g_cfg, g_atr, time[1]);
       g_engine.Update(rates, rates_total, 1, g_cfg, g_atr);
-      // Phase 1 bar-by-bar analysis (read-only; never gates the state machine).
-      if(g_cfg.EnableBarAnalysis)
-        {
-         BarFeatures bf = CBarAnalyzer::Analyze(rates, rates_total, 1, g_atr.At(1), g_cfg);
-         g_log.Debug(CBarAnalyzer::Describe(bf, 1));
-        }
+       // Phase 1 bar-by-bar analysis (read-only; never gates the state machine).
+       if(g_cfg.EnableBarAnalysis)
+         {
+          BarFeatures bf = CBarAnalyzer::Analyze(rates, rates_total, 1, g_atr.At(1), g_cfg);
+          g_log.Debug(CBarAnalyzer::Describe(bf, 1));
+         }
+       // Phase 2 pullback patterns (read-only; never gates the state machine).
+       if(g_cfg.EnablePullbackPatterns)
+         {
+          int td = CPullbackPatterns::TrendDir(rates, rates_total, 1, g_atr.At(1), g_cfg);
+          string pbMsg = StringFormat("PB trend=%d", td);
+          if(td > 0)
+            {
+             PullbackSignal pb = CPullbackPatterns::DetectBull(rates, rates_total, 1, g_atr.At(1), g_cfg);
+             if(pb.found) pbMsg += " " + CPullbackPatterns::DescribePB(pb, true);
+            }
+          else if(td < 0)
+            {
+             PullbackSignal pb = CPullbackPatterns::DetectBear(rates, rates_total, 1, g_atr.At(1), g_cfg);
+             if(pb.found) pbMsg += " " + CPullbackPatterns::DescribePB(pb, false);
+            }
+          DoubleSignal dTop = CPullbackPatterns::FindDoubleTop(sw, g_atr.At(1), g_cfg);
+          DoubleSignal dBot = CPullbackPatterns::FindDoubleBottom(sw, g_atr.At(1), g_cfg);
+          if(dTop.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(dTop);
+          if(dBot.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(dBot);
+          DoubleSignal mTop = CPullbackPatterns::MicroDoubleTop(rates, rates_total, 1, g_atr.At(1), g_cfg);
+          DoubleSignal mBot = CPullbackPatterns::MicroDoubleBottom(rates, rates_total, 1, g_atr.At(1), g_cfg);
+          if(mTop.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(mTop);
+          if(mBot.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(mBot);
+          g_log.Debug(pbMsg);
+         }
       // v2 MTF overlay (read-only annotation; never gates the state machine).
       if(InpMTFTrendTFMinutes > 0)
          g_log.Info(StringFormat("MTF bias=%d (HTF %d min, LOG_ONLY)", MTFBias(), InpMTFTrendTFMinutes));

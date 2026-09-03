@@ -43,8 +43,15 @@ public:
    double            OverlapRatio;
    int               BarbwireBars;
    int               BarbwireMinOverlap;
-   int               PressureLookback;
-   bool              EnableBarAnalysis;  // master switch; false = engine idle
+    int               PressureLookback;
+    bool              EnableBarAnalysis;  // master switch; false = engine idle
+    // Phase 2 pullback patterns (docs/PULLBACK_PATTERNS.md §1)
+    double            MinPullbackDepthATRMult;
+    double            DoubleTopTolATRMult;
+    int               MaxDoubleBars;
+    double            MinDoubleTroughATRMult;
+    int               MicroDoubleBars;
+    bool              EnablePullbackPatterns; // master switch; false = layer idle
    ENUM_CTX_FILTER   ContextFilter;
    ENUM_FM_PRICE_MODE PriceMode;   // HIGHLOW = candles, CLOSE = line chart
    int               MaxActiveSetups;
@@ -82,8 +89,10 @@ public:
       EnableChannelMM=false; EnableGapMM=false; MinGapATRMult=1.0;
       MinPushes=3; UseWedgeExhaustion=true; ShowScore=true;
       DojiMaxBodyRatio=0.15; BigBarATRMult=2.0; SmallBarATRMult=0.5;
-      StrongClosePct=0.70; OverlapRatio=0.50; BarbwireBars=5;
-      BarbwireMinOverlap=3; PressureLookback=10; EnableBarAnalysis=true;
+       StrongClosePct=0.70; OverlapRatio=0.50; BarbwireBars=5;
+       BarbwireMinOverlap=3; PressureLookback=10; EnableBarAnalysis=true;
+       MinPullbackDepthATRMult=0.50; DoubleTopTolATRMult=0.25; MaxDoubleBars=20;
+       MinDoubleTroughATRMult=0.50; MicroDoubleBars=5; EnablePullbackPatterns=true;
       ContextFilter=CTX_LOG_ONLY; PriceMode=FM_PRICE_HIGHLOW;
       MaxActiveSetups=20; MaxBarsForward=100;
       UseIntrabarPotential=false; AtrPeriod=14;
@@ -145,9 +154,19 @@ public:
       if(StrongClosePct>1.0) { StrongClosePct=1.0; ok=false; }
       if(BarbwireBars<3) { BarbwireBars=3; ok=false; }
       if(BarbwireBars>10) { BarbwireBars=10; ok=false; }
-      if(PressureLookback<1) { PressureLookback=1; ok=false; }
-      if(PressureLookback>20) { PressureLookback=20; ok=false; }
-      return ok;
+       if(PressureLookback<1) { PressureLookback=1; ok=false; }
+       if(PressureLookback>20) { PressureLookback=20; ok=false; }
+       if(MinPullbackDepthATRMult<0.1) { MinPullbackDepthATRMult=0.1; ok=false; }
+       if(MinPullbackDepthATRMult>2.0) { MinPullbackDepthATRMult=2.0; ok=false; }
+       if(DoubleTopTolATRMult<0.05) { DoubleTopTolATRMult=0.05; ok=false; }
+       if(DoubleTopTolATRMult>1.0) { DoubleTopTolATRMult=1.0; ok=false; }
+       if(MaxDoubleBars<2) { MaxDoubleBars=2; ok=false; }
+       if(MaxDoubleBars>100) { MaxDoubleBars=100; ok=false; }
+       if(MinDoubleTroughATRMult<0.1) { MinDoubleTroughATRMult=0.1; ok=false; }
+       if(MinDoubleTroughATRMult>2.0) { MinDoubleTroughATRMult=2.0; ok=false; }
+       if(MicroDoubleBars<3) { MicroDoubleBars=3; ok=false; }
+       if(MicroDoubleBars>10) { MicroDoubleBars=10; ok=false; }
+       return ok;
      }
   };
 
