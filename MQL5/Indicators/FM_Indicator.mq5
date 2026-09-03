@@ -59,6 +59,7 @@ input bool   InpRequireFollowThrough= false;
 input bool   InpEnableInverseMM     = true;
 input int    InpFailedBOBars        = 5;
 input ENUM_CTX_FILTER InpContextFilterMode = CTX_LOG_ONLY;
+input ENUM_FM_PRICE_MODE InpPriceMode = FM_PRICE_HIGHLOW; // High/Low (candles) or Close (line chart)
 input int    InpMaxActiveSetups     = 20;
 input int    InpMaxBarsForward      = 100;
 input bool   InpUseIntrabarPotential= false;
@@ -110,6 +111,7 @@ void ApplyInputsToConfig()
    g_cfg.RequireEngulf=InpRequireEngulf; g_cfg.RequireFollowThrough=InpRequireFollowThrough;
    g_cfg.EnableInverseMM=InpEnableInverseMM; g_cfg.FailedBOBars=InpFailedBOBars;
    g_cfg.ContextFilter=InpContextFilterMode;
+   g_cfg.PriceMode=InpPriceMode;
    g_cfg.MaxActiveSetups=InpMaxActiveSetups; g_cfg.MaxBarsForward=InpMaxBarsForward;
    g_cfg.UseIntrabarPotential=InpUseIntrabarPotential; g_cfg.AtrPeriod=InpAtrPeriod;
    g_cfg.ShowLegs=InpShowLegs; g_cfg.ShowPullbacks=InpShowPullbacks;
@@ -200,7 +202,7 @@ int OnCalculate(const int rates_total,
       // ATR over full copy
       g_atr.Update(rates, rates_total);
       // Swings from confirmed bars only (newest closed shift = 1)
-      g_swings.Update(rates, rates_total, 1);
+      g_swings.Update(rates, rates_total, 1, g_cfg.PriceMode);
 
       // Snapshot previous states for edge-triggered buffers/alerts
       int nPrev = g_engine.ActiveCount();

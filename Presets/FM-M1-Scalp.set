@@ -17,6 +17,7 @@ InpRequireFollowThrough=0
 InpEnableInverseMM=1
 InpFailedBOBars=5
 InpContextFilterMode=0
+InpPriceMode=0
 InpMaxActiveSetups=20
 InpMaxBarsForward=60
 InpUseIntrabarPotential=0

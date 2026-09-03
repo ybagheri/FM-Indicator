@@ -32,9 +32,12 @@ detects **Fading Measured Move** setups as an explicit state machine:
 Detection: `InpSwingK=3`, `InpMinLegATRMult=1.0`, `InpMinLegBars=3`,
 `InpMaxLegBars=100`, pullback `0.15–0.90` / `50` bars. FM: approach `1.0×ATR`,
 tolerance `0.25×ATR`, overshoot `0.50×ATR`. Signal bar: close in extreme 50%,
-body ≥30%, adverse wick ≤60%, engulf/follow-through optional. Presets:
-**Conservative** (K4, 1.5×ATR leg, follow-through on),
-**Aggressive** (K2, 0.75×ATR leg). Full table in SPEC §1.
+body ≥30%, adverse wick ≤60%, engulf/follow-through optional.
+**Price mode** `InpPriceMode`: `High/Low` (candles, default) or `Close`
+(line chart — swings/legs/targets/distances on closes, like mobile
+line-chart MM analysis). Presets:
+**Conservative**, **Balanced**, **Aggressive**, **M1-Scalp**, **Line-Chart**.
+Full table in SPEC §1.
 
 ## Chart reading
 

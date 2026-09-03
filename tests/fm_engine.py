@@ -60,9 +60,12 @@ def wilder_atr(bars, period=14):
     return atr2
 
 
-def confirmed_swings(bars, k, last_closed_idx):
+def confirmed_swings(bars, k, last_closed_idx, use_close=False):
     """Return swings confirmed as of last_closed_idx (inclusive newest closed).
-    A swing at s requires s+k <= last_closed_idx."""
+    A swing at s requires s+k <= last_closed_idx.
+    use_close=True mirrors InpPriceMode=CLOSE (line chart)."""
+    def pxH(b): return b['c'] if use_close else b['h']
+    def pxL(b): return b['c'] if use_close else b['l']
     sw = []
     for s in range(k, last_closed_idx - k + 1):
         if s < 1 or s + k >= len(bars):
@@ -70,19 +73,19 @@ def confirmed_swings(bars, k, last_closed_idx):
         # closed bars only: s-k..s+k must be <= last_closed_idx
         if s + k > last_closed_idx:
             continue
-        hi = all(bars[s]['h'] >= bars[j]['h'] for j in range(s-k, s+k+1) if j != s)
-        lo = all(bars[s]['l'] <= bars[j]['l'] for j in range(s-k, s+k+1) if j != s)
+        hi = all(pxH(bars[j]) <= pxH(bars[s]) for j in range(s-k, s+k+1) if j != s)
+        lo = all(pxL(bars[j]) >= pxL(bars[s]) for j in range(s-k, s+k+1) if j != s)
         if hi:
             # earliest-wins tie-break
-            if any(bars[j]['h'] == bars[s]['h'] for j in range(s+1, s+k+1)):
+            if any(pxH(bars[j]) == pxH(bars[s]) for j in range(s+1, s+k+1)):
                 hi = False
         if lo:
-            if any(bars[j]['l'] == bars[s]['l'] for j in range(s+1, s+k+1)):
+            if any(pxL(bars[j]) == pxL(bars[s]) for j in range(s+1, s+k+1)):
                 lo = False
         if hi:
-            sw.append({'bar': s, 'price': bars[s]['h'], 'dir': +1})
+            sw.append({'bar': s, 'price': pxH(bars[s]), 'dir': +1})
         elif lo:
-            sw.append({'bar': s, 'price': bars[s]['l'], 'dir': -1})
+            sw.append({'bar': s, 'price': pxL(bars[s]), 'dir': -1})
     return sw
 
 
@@ -198,7 +201,7 @@ class Engine:
         return any(s.dir == proj['dir'] and abs(s.target - proj['target']) < 1e-9
                    and s.state != INVALIDATED for s in self.setups)
 
-    def update(self, bars, b, atr):
+    def update(self, bars, b, atr, use_close=False):
         cfg = self.cfg
         tol, app, over = cfg.tol_atr*atr, cfg.approach_atr*atr, cfg.over_atr*atr
         for s in self.setups:
@@ -210,7 +213,7 @@ class Engine:
                 s.state = INVALIDATED
                 continue
             bar = bars[b]
-            ext = bar['h'] if s.dir > 0 else bar['l']
+            ext = bar['c'] if use_close else (bar['h'] if s.dir > 0 else bar['l'])
             dist = (s.target - ext) if s.dir > 0 else (ext - s.target)
             ov = (bar['c'] - s.target) if s.dir > 0 else (s.target - bar['c'])
             if ov > over:

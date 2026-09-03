@@ -128,6 +128,18 @@ def test_edge_cases_do_not_crash():
     print("PASS edge_cases")
 
 
+def test_close_mode_ignores_wicks():
+    # One bar has a huge high wick but a normal close: H/L mode sees a swing
+    # high, CLOSE (line-chart) mode must not.
+    bars = [{'o': 100+i*0.2, 'h': 100+i*0.2+0.3, 'l': 100+i*0.2-0.3, 'c': 100+i*0.2} for i in range(15)]
+    bars[7] = {'o': 101.4, 'h': 106.0, 'l': 101.0, 'c': 101.5}  # spike wick, flat close trend
+    hl = confirmed_swings(bars, k=2, last_closed_idx=12, use_close=False)
+    cl = confirmed_swings(bars, k=2, last_closed_idx=12, use_close=True)
+    assert any(s['bar'] == 7 for s in hl), "H/L mode should catch the wick spike"
+    assert not any(s['bar'] == 7 and s['dir'] == +1 for s in cl), "CLOSE mode must ignore wick spike"
+    print("PASS close_mode_ignores_wicks")
+
+
 if __name__ == '__main__':
     test_swing_freeze_no_repaint()
     test_full_fm_lifecycle_bull()
@@ -135,4 +147,5 @@ if __name__ == '__main__':
     test_invalidation_on_overshoot()
     test_pullback_ratio_gates()
     test_edge_cases_do_not_crash()
+    test_close_mode_ignores_wicks()
     print("ALL FM TESTS PASSED")

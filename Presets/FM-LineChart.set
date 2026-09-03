@@ -1,4 +1,4 @@
-; FM Balanced (defaults, SPEC §1) — H1/H4 majors
+; FM Line-Chart (close-based MM, like mobile line-chart analysis)
 InpSwingK=3
 InpMinLegATRMult=1.0
 InpMinLegBars=3
@@ -17,7 +17,7 @@ InpRequireFollowThrough=0
 InpEnableInverseMM=1
 InpFailedBOBars=5
 InpContextFilterMode=0
-InpPriceMode=0
+InpPriceMode=1
 InpMaxActiveSetups=20
 InpMaxBarsForward=100
 InpUseIntrabarPotential=0

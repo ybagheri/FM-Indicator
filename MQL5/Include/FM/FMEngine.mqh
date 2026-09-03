@@ -158,9 +158,12 @@ public:
           if(m_setups[i].bars_since_creation > cfg.MaxBarsForward) { m_setups[i].state=FM_INVALIDATED; continue; }
 
           MqlRates bar = rates[b];
-          double extreme = (m_setups[i].dir > 0) ? bar.high : bar.low;
+          // Line-chart mode measures everything on Close (matches line charts
+          // like your US30 screenshots); candle mode uses High/Low extremes.
+          bool useClosePx = (cfg.PriceMode == FM_PRICE_CLOSE);
+          double extreme = useClosePx ? bar.close : ((m_setups[i].dir > 0) ? bar.high : bar.low);
           double dist = (m_setups[i].dir > 0) ? (m_setups[i].target - extreme) : (extreme - m_setups[i].target);
-          // invalidation by close overshoot
+          // invalidation by close overshoot (both modes: closes decide)
           double over = (m_setups[i].dir > 0) ? (bar.close - m_setups[i].target) : (m_setups[i].target - bar.close);
           if(over > overmax) { m_setups[i].state=FM_INVALIDATED; continue; }
 
@@ -194,7 +197,7 @@ public:
                {
                 int f = -m_setups[i].dir;
                 // signal bar may be current bar b (closed) — must be within tol of target
-                double sigExtreme = (m_setups[i].dir > 0) ? bar.high : bar.low;
+                double sigExtreme = useClosePx ? bar.close : ((m_setups[i].dir > 0) ? bar.high : bar.low);
                 bool nearT = (MathAbs(sigExtreme - m_setups[i].target) <= tol + approach*0.0 + tol);
                 if(CConfirmation::IsSignalBar(rates, count, b, f, cfg) && nearT)
                   {
@@ -218,7 +221,7 @@ public:
                    if(CConfirmation::IsSignalBar(rates, count, b+1, f, cfg) &&
                       CConfirmation::FollowThrough(rates, count, b+1, f))
                      {
-                      double pe = (m_setups[i].dir>0)? rates[b+1].high : rates[b+1].low;
+                       double pe = useClosePx ? rates[b+1].close : ((m_setups[i].dir>0)? rates[b+1].high : rates[b+1].low);
                       if(MathAbs(pe - m_setups[i].target) <= 2*tol) { m_setups[i].state=FM_CONFIRMED; m_setups[i].state_bar_age=0; m_setups[i].signal_time=rates[b].time; }
                      }
                   }

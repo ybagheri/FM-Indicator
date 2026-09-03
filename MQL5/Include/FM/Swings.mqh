@@ -32,31 +32,43 @@ public:
    // Rebuild confirmed swings from series rates. `lastClosed` = shift of the
    // newest closed bar (=1 in MT5 terms is newest; here we pass count-based).
    // We scan candidate s in (lastClosed+k .. oldest) — only confirmed ones.
-   void Update(const MqlRates &rates[], int count, int newest_closed_shift)
+   // price_mode: FM_PRICE_HIGHLOW (H/L) or FM_PRICE_CLOSE (line chart).
+   void Update(const MqlRates &rates[], int count, int newest_closed_shift, ENUM_FM_PRICE_MODE price_mode)
      {
       // newest_closed_shift is normally 1; count = ArraySize(rates)
       ArrayResize(m_swings, 0);
       if(count < 2*m_k + 3) return;
+      bool useClose = (price_mode == FM_PRICE_CLOSE);
       int oldest = count - 1 - m_k;
       for(int s = newest_closed_shift + m_k; s <= oldest; s++)
         {
+         double ps = (useClose ? rates[s].close : rates[s].high);
+         double psL = (useClose ? rates[s].close : rates[s].low);
          bool isHigh = true, isLow = true;
          for(int j = s - m_k; j <= s + m_k; j++)
            {
             if(j==s || j<1 || j>=count) continue; // closed bars only
-            if(rates[j].high > rates[s].high) isHigh = false;
-            if(rates[j].low  < rates[s].low ) isLow  = false;
+            double pjH = (useClose ? rates[j].close : rates[j].high);
+            double pjL = (useClose ? rates[j].close : rates[j].low);
+            if(pjH > ps) isHigh = false;
+            if(pjL < psL) isLow = false;
            }
          // strict-greater tie-break: earliest bar wins; skip if equal extreme exists older
          if(isHigh)
            {
             for(int j = s+1; j <= s+m_k && j<count; j++)
-               if(rates[j].high == rates[s].high) { isHigh=false; break; }
+              {
+               double pjH = (useClose ? rates[j].close : rates[j].high);
+               if(pjH == ps) { isHigh=false; break; }
+              }
            }
          if(isLow)
            {
             for(int j = s+1; j <= s+m_k && j<count; j++)
-               if(rates[j].low == rates[s].low) { isLow=false; break; }
+              {
+               double pjL = (useClose ? rates[j].close : rates[j].low);
+               if(pjL == psL) { isLow=false; break; }
+              }
            }
          if(isHigh || isLow)
            {
@@ -64,7 +76,8 @@ public:
             sp.bar = s;
             sp.dir = isHigh ? +1 : -1;
             // if both (rare flat), prefer high; low will appear via neighbor scan
-            sp.price = isHigh ? rates[s].high : rates[s].low;
+            // line-chart mode: swing price is the close (matches line chart exactly)
+            sp.price = isHigh ? ps : psL;
             sp.confirmed_bar = s - m_k; // newest-closed shift at confirmation... stored as shift
             // NOTE: confirmation bar in "bars-ago" shifts moves as data grows;
             // engine uses bar time comparison instead. Keep field informative.

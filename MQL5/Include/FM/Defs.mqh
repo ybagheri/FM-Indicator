@@ -44,6 +44,12 @@ enum ENUM_LOG_LEVEL
    LOG_DEBUG=3
   };
 
+enum ENUM_FM_PRICE_MODE
+  {
+   FM_PRICE_HIGHLOW=0, // candle extremes (default): swings/legs/targets on H/L
+   FM_PRICE_CLOSE=1    // line-chart mode: swings/legs/targets/distances on Close
+  };
+
 struct SwingPoint
   {
    int               bar;            // closed-bar shift at swing extreme

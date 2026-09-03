@@ -26,6 +26,7 @@ public:
    bool              EnableInverseMM;
    int               FailedBOBars;
    ENUM_CTX_FILTER   ContextFilter;
+   ENUM_FM_PRICE_MODE PriceMode;   // HIGHLOW = candles, CLOSE = line chart
    int               MaxActiveSetups;
    int               MaxBarsForward;
    bool              UseIntrabarPotential;
@@ -57,7 +58,8 @@ public:
       SignalClosePct=0.50; MinBodyRatio=0.30; MaxWickRatio=0.60;
       RequireEngulf=false; RequireFollowThrough=false;
       EnableInverseMM=true; FailedBOBars=5;
-      ContextFilter=CTX_LOG_ONLY; MaxActiveSetups=20; MaxBarsForward=100;
+      ContextFilter=CTX_LOG_ONLY; PriceMode=FM_PRICE_HIGHLOW;
+      MaxActiveSetups=20; MaxBarsForward=100;
       UseIntrabarPotential=false; AtrPeriod=14;
       ShowLegs=true; ShowPullbacks=true; ShowTargets=true; ShowZones=true;
       AlertPotential=true; AlertDeveloping=true; AlertConfirmed=true;
