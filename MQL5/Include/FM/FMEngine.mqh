@@ -150,89 +150,88 @@ public:
       double overmax = cfg.MaxOvershootATRMult * a;
 
       for(int i = 0; i < ArraySize(m_setups); i++)
-        {
-         CFMSetup &s = m_setups[i];
-         if(s.state==FM_INVALIDATED || s.state==FM_COMPLETED) continue;
-         s.bars_since_creation++;
-         s.state_bar_age++;
-         if(s.bars_since_creation > cfg.MaxBarsForward) { s.state=FM_INVALIDATED; continue; }
+         {
+          if(m_setups[i].state==FM_INVALIDATED || m_setups[i].state==FM_COMPLETED) continue;
+          m_setups[i].bars_since_creation++;
+          m_setups[i].state_bar_age++;
+          if(m_setups[i].bars_since_creation > cfg.MaxBarsForward) { m_setups[i].state=FM_INVALIDATED; continue; }
 
-         MqlRates bar = rates[b];
-         double extreme = (s.dir > 0) ? bar.high : bar.low;
-         double dist = (s.dir > 0) ? (s.target - extreme) : (extreme - s.target);
-         // invalidation by close overshoot
-         double over = (s.dir > 0) ? (bar.close - s.target) : (s.target - bar.close);
-         if(over > overmax) { s.state=FM_INVALIDATED; continue; }
+          MqlRates bar = rates[b];
+          double extreme = (m_setups[i].dir > 0) ? bar.high : bar.low;
+          double dist = (m_setups[i].dir > 0) ? (m_setups[i].target - extreme) : (extreme - m_setups[i].target);
+          // invalidation by close overshoot
+          double over = (m_setups[i].dir > 0) ? (bar.close - m_setups[i].target) : (m_setups[i].target - bar.close);
+          if(over > overmax) { m_setups[i].state=FM_INVALIDATED; continue; }
 
-         // context
-         ENUM_FM_CONTEXT cx; double cf;
-         m_ctx.Classify(rates, count, b, a, cx, cf);
-         s.context=cx; s.confidence=cf;
-         bool veto = (cfg.ContextFilter==CTX_VETO && cf < 0.3 &&
-                      ((cx==FM_CTX_TREND && 1==1))); // weak-context veto (conservative)
+          // context
+          ENUM_FM_CONTEXT cx; double cf;
+          m_ctx.Classify(rates, count, b, a, cx, cf);
+          m_setups[i].context=cx; m_setups[i].confidence=cf;
+          bool veto = (cfg.ContextFilter==CTX_VETO && cf < 0.3 &&
+                       ((cx==FM_CTX_TREND && 1==1))); // weak-context veto (conservative)
 
-         switch(s.state)
-           {
-            case FM_PROJECTED:
-               if(!veto && dist >= 0 && dist <= approach)
-                 { s.state=FM_POTENTIAL; s.state_bar_age=0; }
-               break;
-            case FM_POTENTIAL:
-               if(MathAbs(extreme - s.target) <= tol)
-                 {
-                  if(CConfirmation::ExhaustionAny(rates, count, b, s.dir, a))
-                    { s.state=FM_DEVELOPING; s.state_bar_age=0; }
-                 }
-               else if(dist < 0 || dist > approach + tol)
-                 {
-                  // left zone without touching: back to PROJECTED (keeps history honest)
-                  if(dist < 0 && MathAbs(extreme - s.target) > tol)
-                    { /* penetrated but no exhaustion → stay POTENTIAL one more bar */ }
-                 }
-               break;
-            case FM_DEVELOPING:
-              {
-               int f = -s.dir;
-               // signal bar may be current bar b (closed) — must be within tol of target
-               double sigExtreme = (s.dir > 0) ? bar.high : bar.low;
-               bool nearT = (MathAbs(sigExtreme - s.target) <= tol + approach*0.0 + tol);
-               if(CConfirmation::IsSignalBar(rates, count, b, f, cfg) && nearT)
-                 {
-                  bool ok = true;
-                  if(cfg.RequireFollowThrough)
-                    {
-                     // need next-bar confirmation: stay DEVELOPING until older-bar... we check
-                     // bar b-1 only if it is closed (b==1 → b-1==0 forming → not allowed)
-                     ok = false; // wait one more bar; handled below via state_bar_age
-                    }
-                  if(ok)
-                    {
-                     if(cfg.ContextFilter==CTX_DEMOTE && cf < 0.5)
-                       { /* stay DEVELOPING */ }
-                     else { s.state=FM_CONFIRMED; s.state_bar_age=0; }
-                    }
-                 }
-               // delayed follow-through: if previous bar was signal and current confirms
-               if(s.state==FM_DEVELOPING && cfg.RequireFollowThrough && s.state_bar_age>=1 && b>=2)
-                 {
-                  if(CConfirmation::IsSignalBar(rates, count, b+1, f, cfg) &&
-                     CConfirmation::FollowThrough(rates, count, b+1, f))
-                    {
-                     double pe = (s.dir>0)? rates[b+1].high : rates[b+1].low;
-                     if(MathAbs(pe - s.target) <= 2*tol) { s.state=FM_CONFIRMED; s.state_bar_age=0; }
-                    }
-                 }
-               // lost zone → back to POTENTIAL
-               if(s.state==FM_DEVELOPING && MathAbs(extreme - s.target) > tol + approach)
-                 { s.state=FM_POTENTIAL; s.state_bar_age=0; }
-               break;
-              }
-            case FM_CONFIRMED:
-               s.state=FM_COMPLETED;
-               break;
-            default: break;
-           }
-        }
+          switch(m_setups[i].state)
+            {
+             case FM_PROJECTED:
+                if(!veto && dist >= 0 && dist <= approach)
+                  { m_setups[i].state=FM_POTENTIAL; m_setups[i].state_bar_age=0; }
+                break;
+             case FM_POTENTIAL:
+                if(MathAbs(extreme - m_setups[i].target) <= tol)
+                  {
+                   if(CConfirmation::ExhaustionAny(rates, count, b, m_setups[i].dir, a))
+                     { m_setups[i].state=FM_DEVELOPING; m_setups[i].state_bar_age=0; }
+                  }
+                else if(dist < 0 || dist > approach + tol)
+                  {
+                   // left zone without touching: back to PROJECTED (keeps history honest)
+                   if(dist < 0 && MathAbs(extreme - m_setups[i].target) > tol)
+                     { /* penetrated but no exhaustion → stay POTENTIAL one more bar */ }
+                  }
+                break;
+             case FM_DEVELOPING:
+               {
+                int f = -m_setups[i].dir;
+                // signal bar may be current bar b (closed) — must be within tol of target
+                double sigExtreme = (m_setups[i].dir > 0) ? bar.high : bar.low;
+                bool nearT = (MathAbs(sigExtreme - m_setups[i].target) <= tol + approach*0.0 + tol);
+                if(CConfirmation::IsSignalBar(rates, count, b, f, cfg) && nearT)
+                  {
+                   bool ok = true;
+                   if(cfg.RequireFollowThrough)
+                     {
+                      // need next-bar confirmation: stay DEVELOPING until older-bar... we check
+                      // bar b-1 only if it is closed (b==1 → b-1==0 forming → not allowed)
+                      ok = false; // wait one more bar; handled below via state_bar_age
+                     }
+                   if(ok)
+                     {
+                      if(cfg.ContextFilter==CTX_DEMOTE && cf < 0.5)
+                        { /* stay DEVELOPING */ }
+                      else { m_setups[i].state=FM_CONFIRMED; m_setups[i].state_bar_age=0; }
+                     }
+                  }
+                // delayed follow-through: if previous bar was signal and current confirms
+                if(m_setups[i].state==FM_DEVELOPING && cfg.RequireFollowThrough && m_setups[i].state_bar_age>=1 && b>=2)
+                  {
+                   if(CConfirmation::IsSignalBar(rates, count, b+1, f, cfg) &&
+                      CConfirmation::FollowThrough(rates, count, b+1, f))
+                     {
+                      double pe = (m_setups[i].dir>0)? rates[b+1].high : rates[b+1].low;
+                      if(MathAbs(pe - m_setups[i].target) <= 2*tol) { m_setups[i].state=FM_CONFIRMED; m_setups[i].state_bar_age=0; }
+                     }
+                  }
+                // lost zone → back to POTENTIAL
+                if(m_setups[i].state==FM_DEVELOPING && MathAbs(extreme - m_setups[i].target) > tol + approach)
+                  { m_setups[i].state=FM_POTENTIAL; m_setups[i].state_bar_age=0; }
+                break;
+               }
+             case FM_CONFIRMED:
+                m_setups[i].state=FM_COMPLETED;
+                break;
+             default: break;
+            }
+         }
       // prune invalidated beyond cap
       int w=0;
       for(int i=0;i<ArraySize(m_setups);i++)
