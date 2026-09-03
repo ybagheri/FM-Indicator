@@ -62,6 +62,11 @@ public:
     int               BOFollowBars;
     int               BOTrapLookback;
     bool              EnableBreakout;     // master switch; false = layer idle
+    // Phase 5 reversal engine (docs/REVERSAL_ENGINE.md §1)
+    int               RevLookback;
+    double            RevRetestTolATRMult;
+    int               RevMinPressure;
+    bool              EnableReversal;     // master switch; false = layer idle
    ENUM_CTX_FILTER   ContextFilter;
    ENUM_FM_PRICE_MODE PriceMode;   // HIGHLOW = candles, CLOSE = line chart
    int               MaxActiveSetups;
@@ -106,6 +111,8 @@ public:
        StateLookback=20; StateOverlapBars=10; EnableMarketState=true;
        BOLookback=20; BOToleranceATRMult=0.10; BOFollowBars=5;
        BOTrapLookback=20; EnableBreakout=true;
+       RevLookback=10; RevRetestTolATRMult=0.25; RevMinPressure=5;
+       EnableReversal=true;
       ContextFilter=CTX_LOG_ONLY; PriceMode=FM_PRICE_HIGHLOW;
       MaxActiveSetups=20; MaxBarsForward=100;
       UseIntrabarPotential=false; AtrPeriod=14;
@@ -191,6 +198,12 @@ public:
        if(BOFollowBars>20) { BOFollowBars=20; ok=false; }
        if(BOTrapLookback<5) { BOTrapLookback=5; ok=false; }
        if(BOTrapLookback>100) { BOTrapLookback=100; ok=false; }
+       if(RevLookback<5) { RevLookback=5; ok=false; }
+       if(RevLookback>50) { RevLookback=50; ok=false; }
+       if(RevRetestTolATRMult<0.05) { RevRetestTolATRMult=0.05; ok=false; }
+       if(RevRetestTolATRMult>1.0) { RevRetestTolATRMult=1.0; ok=false; }
+       if(RevMinPressure<3) { RevMinPressure=3; ok=false; }
+       if(RevMinPressure>10) { RevMinPressure=10; ok=false; }
        return ok;
      }
   };

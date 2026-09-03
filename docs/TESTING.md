@@ -1,4 +1,4 @@
-# TESTING — FM Indicator v1.2 + v2 research + Phase-1..4 engines
+# TESTING — FM Indicator v1.2 + v2 research + Phase-1..5 engines
 
 ## Method
 
@@ -8,11 +8,12 @@
 - Pullback oracle: `tests/pullback_patterns.py` (1:1 mirror of PULLBACK_PATTERNS.md).
 - State oracle: `tests/market_state.py` (1:1 mirror of MARKET_STATE.md).
 - Breakout oracle: `tests/breakout.py` (1:1 mirror of BREAKOUT_ENGINE.md).
-- Run: `python3 -m pytest tests/ -q` → 54 tests, ALL PASS (19 FM + 7 bar +
-  10 pullback + 9 state + 9 breakout; or per-file via `__main__`).
+- Reversal oracle: `tests/reversal.py` (1:1 mirror of REVERSAL_ENGINE.md).
+- Run: `python3 -m pytest tests/ -q` → 64 tests, ALL PASS (19 FM + 7 bar +
+  10 pullback + 9 state + 9 breakout + 10 reversal; or per-file via `__main__`).
 - MQL5 compile: MetaEditor on Windows (F7). Linux env has no
   `metaeditor.exe`/`wine`; static check = balanced-delimiter scan
-  (comment/string-stripped) over all 17 MQL5 files → OK.
+  (comment/string-stripped) over all 18 MQL5 files → OK.
 
 ## Cases → expected
 
@@ -65,6 +66,16 @@
 | 45 | Second-leg trap armed | fail then re-break → TRAP + PENDING | PASS |
 | 46 | Stale BO outside window | beyond FollowBars → none | PASS |
 | 47 | BO freeze + safety | identical after extension; zero-ATR/tiny/disabled safe | PASS |
+| 48 | Climax bar (range ≥2×ATR) | climax true, breadth OR-sum exact | PASS |
+| 49 | Stall bar (narrow, two-sided wicks) | stall true, no climax | PASS |
+| 50 | 4 shrinking pushes | pushes 4, wedge true, bear silent | PASS |
+| 51 | Overshoot spike | overshoot true; short history silent | PASS |
+| 52 | Breadth OR-parity | quiet 0; single-flag ≥1; beyond-close/zero-ATR 0 | PASS |
+| 53 | Bull pullback legs 1→2+deep | legs 1/2, depth 0.5/0.8, DEEP; empty/no-anchor safe | PASS |
+| 54 | Bear legs mirror | legs 2, depth 0.8, DEEP | PASS |
+| 55 | MTR MAJOR (all four legs) | MAJOR, score 100, BO FOLLOW + pressure | PASS |
+| 56 | MTR MINOR (partial legs) | MINOR, score 50, EMA + retest only | PASS |
+| 57 | Reversal freeze + safety | identical after extension; zero-ATR/tiny/disabled safe | PASS |
 
 ## Coverage map (prompt §TESTING 1–12 + v1.2/v2)
 
@@ -97,6 +108,13 @@ Phase 4 breakouts (`test_breakout.py`, 9 suites): bull pending/follow/failed
 (FAILED precedence); bear mirror; swing-ref tie-break; tolerance poke silent;
 second-leg trap armed; stale BO outside FollowBars silent;
 freeze/no-look-ahead/zero-ATR/tiny-history/disabled safety.
+Phase 5 reversals (`test_reversal.py`, 10 suites): climax/stall geometry;
+shrinking 4-push wedge (+bear-side silence); overshoot spike vs short-history
+silence; breadth OR-parity (quiet 0, single-flag ≥1, beyond-close/zero-ATR 0);
+bull legs 1→2+deep (depth 0.5/0.8) + empty/no-anchor cases; bear mirror;
+MTR MAJOR (EMA-cross + retest + Phase-4 FOLLOW + pressure, score 100);
+MTR MINOR (EMA + retest only, score 50);
+NONE/freeze/no-look-ahead/zero-ATR/tiny-history/disabled safety.
 
 ## Reproduce
 

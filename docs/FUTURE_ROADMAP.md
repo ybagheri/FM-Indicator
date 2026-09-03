@@ -41,9 +41,8 @@
   (`MARKET_STATE.md` + `MarketState.mqh` + mirror + 9 tests, read-only hook).
 - [x] Phase 4: breakout + generalized failed-breakout/trap engine
   (`BREAKOUT_ENGINE.md` + `BreakoutEngine.mqh` + mirror + 9 tests, read-only hook).
-- Phase 3: market-state engine (TREND/CHANNEL/RANGE/BREAKOUT_MODE scores).
-- Phase 4: breakout + generalized failed-breakout/trap engine.
-- Phase 5: pullback/reversal/MTR + dedicated exhaustion analyzer.
+- [x] Phase 5: pullback/reversal/MTR + dedicated exhaustion analyzer
+  (`REVERSAL_ENGINE.md` + `ReversalEngine.mqh` + mirror + 10 tests, read-only hook).
 - Phase 6: FM as setup-engine module (entry/stop/target/R per setup).
 - Phase 7: setup engine (trend-continuation, pullback, BO, reversals).
 - Phase 8: decision engine (BUY/SELL/WAIT/NO_TRADE + reasons) + visualization.

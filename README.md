@@ -48,6 +48,10 @@ see `docs/MARKET_STATE.md`.
 Phase-4 breakout engine (read-only): N-bar/swing BO events with
 PENDING→FOLLOW/FAILED lifecycle + second-leg trap flag, DEBUG-logged when
 found, never gating signals — see `docs/BREAKOUT_ENGINE.md`.
+Phase-5 reversal engine (read-only): per-bar exhaustion breadth
+(climax/stall/pushes/wedge/overshoot) + pullback leg counting + EMA-cross
+MTR proxy (MINOR/MAJOR, unit weights), DEBUG-logged when found, never
+gating signals — see `docs/REVERSAL_ENGINE.md`.
 **Price mode** `InpPriceMode`: `High/Low` (candles, default) or `Close`
 (line chart — swings/legs/targets/distances on closes, like mobile
 line-chart MM analysis). Families v1.2 (default OFF): `InpEnableRangeMM` /
@@ -107,6 +111,7 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 `docs/BAR_BY_BAR_ENGINE.md` · `docs/PULLBACK_PATTERNS.md` ·
 `docs/MARKET_STATE.md` ·
 `docs/BREAKOUT_ENGINE.md` ·
+`docs/REVERSAL_ENGINE.md` ·
 `docs/MARKET_CONTEXT.md` ·
 `docs/SYSTEMATIC_SPECIFICATION.md` ·
 `docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/FUTURE_ROADMAP.md`

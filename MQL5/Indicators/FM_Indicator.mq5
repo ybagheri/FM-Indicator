@@ -39,6 +39,7 @@
 #include <FM/PullbackPatterns.mqh>
 #include <FM/MarketState.mqh>
 #include <FM/BreakoutEngine.mqh>
+#include <FM/ReversalEngine.mqh>
 #include <FM/MeasuredMove.mqh>
 #include <FM/FMEngine.mqh>
 #include <FM/Visualizer.mqh>
@@ -89,6 +90,10 @@ input double InpBOToleranceATRMult  = 0.10;  // Phase 4: close must clear ref by
 input int    InpBOFollowBars        = 5;     // Phase 4: active-breakout window (bars)
 input int    InpBOTrapLookback      = 20;    // Phase 4: prior-failure scan (bars)
 input bool   InpEnableBreakout      = true;  // Phase 4: breakout/trap engine (read-only)
+input int    InpRevLookback         = 10;    // Phase 5: MTR cross/retest window (bars)
+input double InpRevRetestTolATRMult = 0.25;  // Phase 5: EMA touch band (xATR)
+input int    InpRevMinPressure      = 5;     // Phase 5: pushes for MTR pressure leg
+input bool   InpEnableReversal      = true;  // Phase 5: reversal engine (read-only)
 input int    InpMTFTrendTFMinutes   = 0;      // v2 MTF overlay: 0=off, else higher-TF minutes
 input bool   InpExportCSV           = false;  // v2: write signals CSV on new CONFIRMED
 input string InpCSVFile             = "FM_signals.csv";
@@ -163,6 +168,10 @@ void ApplyInputsToConfig()
    g_cfg.BOLookback=InpBOLookback; g_cfg.BOToleranceATRMult=InpBOToleranceATRMult;
    g_cfg.BOFollowBars=InpBOFollowBars; g_cfg.BOTrapLookback=InpBOTrapLookback;
    g_cfg.EnableBreakout=InpEnableBreakout;
+   g_cfg.RevLookback=InpRevLookback;
+   g_cfg.RevRetestTolATRMult=InpRevRetestTolATRMult;
+   g_cfg.RevMinPressure=InpRevMinPressure;
+   g_cfg.EnableReversal=InpEnableReversal;
    g_cfg.ContextFilter=InpContextFilterMode;
    g_cfg.PriceMode=InpPriceMode;
    g_cfg.MaxActiveSetups=InpMaxActiveSetups; g_cfg.MaxBarsForward=InpMaxBarsForward;
@@ -341,6 +350,22 @@ int OnCalculate(const int rates_total,
          {
           BreakoutSignal bo = CBreakoutEngine::Analyze(rates, rates_total, 1, g_atr.At(1), sw, g_cfg);
           if(bo.found) g_log.Debug(CBreakoutEngine::Describe(bo));
+         }
+       // Phase 5 reversal engine (read-only; never gates the state machine).
+       if(g_cfg.EnableReversal)
+         {
+          ReversalSignal rvB = CMajorReversal::Analyze(rates, rates_total, 1, g_atr.At(1), sw, g_cfg, +1);
+          ReversalSignal rvS = CMajorReversal::Analyze(rates, rates_total, 1, g_atr.At(1), sw, g_cfg, -1);
+          if(rvB.found) g_log.Debug(CMajorReversal::Describe(rvB));
+          if(rvS.found) g_log.Debug(CMajorReversal::Describe(rvS));
+          ExhaustionReport exB = CExhaustionAnalyzer::Report(rates, rates_total, 1, +1, g_atr.At(1), g_cfg);
+          ExhaustionReport exS = CExhaustionAnalyzer::Report(rates, rates_total, 1, -1, g_atr.At(1), g_cfg);
+          if(exB.breadth > 0) g_log.Debug(CExhaustionAnalyzer::Describe(exB, +1));
+          if(exS.breadth > 0) g_log.Debug(CExhaustionAnalyzer::Describe(exS, -1));
+          LegCount lgB = CLegCounter::CountBull(sw);
+          LegCount lgS = CLegCounter::CountBear(sw);
+          if(lgB.valid && lgB.legs > 0) g_log.Debug(CLegCounter::Describe(lgB, +1));
+          if(lgS.valid && lgS.legs > 0) g_log.Debug(CLegCounter::Describe(lgS, -1));
          }
       // v2 MTF overlay (read-only annotation; never gates the state machine).
       if(InpMTFTrendTFMinutes > 0)

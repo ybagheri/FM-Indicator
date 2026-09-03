@@ -77,6 +77,15 @@ enum ENUM_BO_OUTCOME
    BO_FAILED=3
   };
 
+// Phase 5 reversal verdicts (docs/REVERSAL_ENGINE.md §5). Full reversal
+// setup states belong to the Phase-7 setup engine.
+enum ENUM_REV_VERDICT
+  {
+   REV_NONE=0,
+   REV_MINOR=1,
+   REV_MAJOR=2
+  };
+
 struct SwingPoint
   {
    int               bar;            // closed-bar shift at swing extreme
