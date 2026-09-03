@@ -17,10 +17,13 @@ enum ENUM_FM_STATE
   };
 
 enum ENUM_MM_FAMILY
-  {
-   MM_REGULAR=0,   // Leg1=Leg2
-   MM_INVERSE=1    // failed-BO inverse
-  };
+   {
+    MM_REGULAR=0,   // Leg1=Leg2
+    MM_INVERSE=1,   // failed-BO inverse
+    MM_RANGE=2,     // v1.2: trading-range height breakout
+    MM_CHANNEL=3,   // v1.2: shallow-pullback channel continuation
+    MM_GAP=4        // v1.2: measuring-gap projection
+   };
 
 enum ENUM_FM_CONTEXT
   {

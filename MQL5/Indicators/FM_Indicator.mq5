@@ -6,7 +6,7 @@
 //|          Include/FM/, then compile in MetaEditor (F7).             |
 //+------------------------------------------------------------------+
 #property copyright "FM-Indicator contributors"
-#property version   "1.00"
+#property version   "1.20"
 #property indicator_chart_window
 #property indicator_buffers 6
 #property indicator_plots   4
@@ -58,6 +58,17 @@ input bool   InpRequireEngulf       = false;
 input bool   InpRequireFollowThrough= false;
 input bool   InpEnableInverseMM     = true;
 input int    InpFailedBOBars        = 5;
+input bool   InpEnableRangeMM       = false;  // v1.2 range-height breakout family
+input int    InpRangeLookback       = 50;
+input bool   InpEnableChannelMM     = false;  // v1.2 shallow-pullback channel family
+input bool   InpEnableGapMM         = false;  // v1.2 measuring-gap family
+input double InpMinGapATRMult       = 1.0;
+input int    InpMinPushes           = 3;      // v1.2 exhaustion push threshold 2..5
+input bool   InpUseWedgeExhaustion  = true;
+input bool   InpShowScore           = true;   // v1.2 display-only S=0..100
+input int    InpMTFTrendTFMinutes   = 0;      // v2 MTF overlay: 0=off, else higher-TF minutes
+input bool   InpExportCSV           = false;  // v2: write signals CSV on new CONFIRMED
+input string InpCSVFile             = "FM_signals.csv";
 input ENUM_CTX_FILTER InpContextFilterMode = CTX_LOG_ONLY;
 input ENUM_FM_PRICE_MODE InpPriceMode = FM_PRICE_HIGHLOW; // High/Low (candles) or Close (line chart)
 input int    InpMaxActiveSetups     = 20;
@@ -110,6 +121,11 @@ void ApplyInputsToConfig()
    g_cfg.MaxWickRatio=InpMaxWickRatio;
    g_cfg.RequireEngulf=InpRequireEngulf; g_cfg.RequireFollowThrough=InpRequireFollowThrough;
    g_cfg.EnableInverseMM=InpEnableInverseMM; g_cfg.FailedBOBars=InpFailedBOBars;
+   g_cfg.EnableRangeMM=InpEnableRangeMM; g_cfg.RangeLookback=InpRangeLookback;
+   g_cfg.EnableChannelMM=InpEnableChannelMM; g_cfg.EnableGapMM=InpEnableGapMM;
+   g_cfg.MinGapATRMult=InpMinGapATRMult;
+   g_cfg.MinPushes=InpMinPushes; g_cfg.UseWedgeExhaustion=InpUseWedgeExhaustion;
+   g_cfg.ShowScore=InpShowScore;
    g_cfg.ContextFilter=InpContextFilterMode;
    g_cfg.PriceMode=InpPriceMode;
    g_cfg.MaxActiveSetups=InpMaxActiveSetups; g_cfg.MaxBarsForward=InpMaxBarsForward;
@@ -160,6 +176,41 @@ void OnDeinit(const int reason)
    g_viz.DeleteAll();
   }
 
+// v2 MTF overlay (read-only): higher-TF bias from 20/50 SMA on closed bars.
+// Returns +1/-1/0; never affects the state machine (SPEC §7 LOG_ONLY).
+int MTFBias()
+  {
+   if(InpMTFTrendTFMinutes <= 0) return 0;
+   ENUM_TIMEFRAMES htf = (ENUM_TIMEFRAMES)InpMTFTrendTFMinutes;
+   double c[];
+   int need = 60;
+   if(CopyClose(_Symbol, htf, 1, need, c) < need) return 0;
+   double s20 = 0, s50 = 0;
+   for(int i = 0; i < 20; i++) s20 += c[i];
+   for(int i = 0; i < 50; i++) s50 += c[i];
+   s20 /= 20.0; s50 /= 50.0;
+   double rng = c[0];
+   if(rng == 0) return 0;
+   double gap = (s20 - s50) / MathMax(1e-9, g_atr.At(1));
+   if(gap > 0.8) return +1;
+   if(gap < -0.8) return -1;
+   return 0;
+  }
+
+// v2 research export: append one CSV row per CONFIRMED (closed-bar only).
+void ExportSignalRow(datetime bt, const CFMSetup &s, double px, int score)
+  {
+   int h = FileOpen(InpCSVFile, FILE_CSV|FILE_READ|FILE_WRITE, ',');
+   if(h == INVALID_HANDLE) return;
+   FileSeek(h, 0, SEEK_END);
+   if(FileSize(h) == 0)
+      FileWrite(h, "time", "id", "family", "dir", "target", "price", "score", "symbol", "tf");
+   FileWrite(h, TimeToString(bt, TIME_DATE|TIME_SECONDS), s.id, (int)s.family,
+             s.dir, DoubleToString(s.target, _Digits), DoubleToString(px, _Digits),
+             score, _Symbol, EnumToString((ENUM_TIMEFRAMES)_Period));
+   FileClose(h);
+  }
+
 // Full-history incremental core: recompute confirmed structure on new closed
 // bar; on tick-without-new-close only optional intrabar POTENTIAL preview.
 int OnCalculate(const int rates_total,
@@ -181,11 +232,6 @@ int OnCalculate(const int rates_total,
    // Build series copy (series mode, [0]=forming)
    MqlRates rates[];
    ArrayResize(rates, rates_total);
-   for(int i=0;i<rates_total;i++)
-     {
-      rates[rates_total-1-i].time=time[i]; // convert non-series loop → then set series
-     }
-   // simpler: fill in series order directly
    for(int i=0;i<rates_total;i++)
      {
       rates[i].time=time[i]; rates[i].open=open[i]; rates[i].high=high[i];
@@ -216,6 +262,9 @@ int OnCalculate(const int rates_total,
 
       g_engine.FormProjections(sw, rates, rates_total, g_cfg, g_atr, time[1]);
       g_engine.Update(rates, rates_total, 1, g_cfg, g_atr);
+      // v2 MTF overlay (read-only annotation; never gates the state machine).
+      if(InpMTFTrendTFMinutes > 0)
+         g_log.Info(StringFormat("MTF bias=%d (HTF %d min, LOG_ONLY)", MTFBias(), InpMTFTrendTFMinutes));
 
       // Write DATA buffers at shift 1 (the just-closed bar). Never rewrite older
       // shifts here → freeze guarantee (history built bar-by-bar identically).
@@ -240,7 +289,17 @@ int OnCalculate(const int rates_total,
             double px = close[1];
             if(s.state==FM_POTENTIAL) BufPotential[1]=px;
             else if(s.state==FM_DEVELOPING) BufDeveloping[1]=px;
-            else if(s.state==FM_CONFIRMED) BufConfirmed[1]=px;
+            else if(s.state==FM_CONFIRMED)
+              {
+               BufConfirmed[1]=px;
+               if(InpExportCSV)
+                 {
+                  int fdir = -s.dir;
+                  double dt = (g_atr.At(1) > 0) ? ((s.dir > 0 ? s.target - high[1] : low[1] - s.target) / g_atr.At(1)) : 0;
+                  int q = CConfirmation::ScoreSignal(rates, rates_total, 1, fdir, g_cfg, s.dir, g_atr.At(1), dt, s.confidence);
+                  ExportSignalRow(time[1], s, px, q);
+                 }
+              }
             if(s.state==FM_CONFIRMED || s.state==FM_DEVELOPING || s.state==FM_POTENTIAL)
               {
                if(g_engine.ClaimAlert(s.id, s.state))

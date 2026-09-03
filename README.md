@@ -1,8 +1,10 @@
 # FM-Indicator — Fading Measured Moves (Al Brooks Price Action) for MT5
 
-Systematic, configurable, testable MQL5 indicator that projects **Leg1=Leg2
-(AB=CD)** measured moves (plus optional **failed-breakout inverse-MM**) and
-detects **Fading Measured Move** setups as an explicit state machine:
+Systematic, configurable, testable MQL5 indicator (v1.20) that projects
+**Leg1=Leg2 (AB=CD)** measured moves plus three v1.2 families — **range-height
+breakout**, **shallow-pullback channel**, **measuring gap** — plus optional
+**failed-breakout inverse-MM**, and detects **Fading Measured Move** setups as
+an explicit state machine:
 
 `PROJECTED → POTENTIAL → DEVELOPING → CONFIRMED → COMPLETED`, with
 `→ INVALIDATED` from any state. No profitability claims.
@@ -32,12 +34,17 @@ detects **Fading Measured Move** setups as an explicit state machine:
 Detection: `InpSwingK=3`, `InpMinLegATRMult=1.0`, `InpMinLegBars=3`,
 `InpMaxLegBars=100`, pullback `0.15–0.90` / `50` bars. FM: approach `1.0×ATR`,
 tolerance `0.25×ATR`, overshoot `0.50×ATR`. Signal bar: close in extreme 50%,
-body ≥30%, adverse wick ≤60%, engulf/follow-through optional.
+body ≥30%, adverse wick ≤60%, engulf/follow-through optional
+(follow-through = 1-bar delayed confirm). Exhaustion v1.2: `InpMinPushes=3` +
+wedge toggle. Score v1.2: display-only `S=0..100` in labels.
 **Price mode** `InpPriceMode`: `High/Low` (candles, default) or `Close`
 (line chart — swings/legs/targets/distances on closes, like mobile
-line-chart MM analysis). Presets:
-**Conservative**, **Balanced**, **Aggressive**, **M1-Scalp**, **Line-Chart**.
-Full table in SPEC §1.
+line-chart MM analysis). Families v1.2 (default OFF): `InpEnableRangeMM` /
+`RangeLookback=50`, `InpEnableChannelMM` (depth 0.02–0.15 only),
+`InpEnableGapMM` / `MinGapATRMult=1.0`. v2 research: `InpMTFTrendTFMinutes`
+(read-only bias, 0=off), `InpExportCSV`/`InpCSVFile`. Presets:
+**Conservative**, **Balanced**, **Aggressive**, **M1-Scalp**, **Line-Chart**,
+**Families** (all MM families ON). Full table in SPEC §1.
 
 ## Chart reading
 
@@ -47,12 +54,16 @@ Full table in SPEC §1.
 - Labels now carry explicit fade direction: `SELL` = fade a bull MM (short),
   `BUY` = fade a bear MM (long); DEVELOPING/CONFIRMED also draw a red/green
   arrow at the signal bar. Close targets stagger vertically so they stay readable.
+  Family prefix: `INV`/`RNG`/`CH`/`GAP` (regular = none); `S=0..100` score when
+  `InpShowScore` (display only, never trades).
 - Presets in `Presets/`: Balanced, Conservative, Aggressive, **M1-Scalp**
-  (for noisy M1 like EURUSD). Load via indicator Inputs → Load.
+  (for noisy M1 like EURUSD), **Families** (v1.2 all-families research).
+  Load via indicator Inputs → Load.
 - Toggles: `InpShowLegs/Pullbacks/Targets/Zones`. Objects named `FM_<id>_*`,
   auto-deleted on invalidation/expiry/symbol-timeframe change.
 - EA use: DATA buffers `Target/Potential/Developing/Confirmed` (frozen after
-  close) or `#include <FM/FMEngine.mqh>` → `CFMEngine::Active()`.
+  close) or `#include <FM/FMEngine.mqh>` → `CFMEngine::ActiveSnapshots()`.
+  v2 research: CSV export per CONFIRMED + Python `backtest_run`/MAE/MFE.
 
 ## Real-time / repaint contract
 
@@ -70,10 +81,12 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 
 ## Limitations
 
-- v1 implements one MM family (Leg1=Leg2 + inverse); range/channel/gap
-  variants are architecture-reserved subclasses, not implemented.
+- v1.2 families + v2 tooling are implemented and mirror-tested (19 Python
+  tests), but live statistical validation is still pending — see roadmap
+  before any live use.
 - Context (Trend/Range/Transition) defaults to LOG_ONLY — it annotates, never
-  vetoes, faithful to Brooks "context, not trigger".
+  vetoes, faithful to Brooks "context, not trigger". MTF overlay is likewise
+  read-only.
 - Compile in MetaEditor on Windows; this Linux env validates logic via the
   Python mirror (`tests/`), not `metaeditor.exe`.
 

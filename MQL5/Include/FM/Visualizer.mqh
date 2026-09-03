@@ -85,10 +85,19 @@ public:
             ObjectSetInteger(0, zname, OBJPROP_BACK, true);
             ObjectMove(0, zname, 1, TimeCurrent(), s.target);
            }
-         // Explicit fade direction: bull MM fades SHORT, bear MM fades LONG.
-         string side = (s.dir > 0 ? "SELL" : "BUY");
-         string st = (s.state==FM_PROJECTED?"MM":(s.state==FM_POTENTIAL?"POTENTIAL":(s.state==FM_DEVELOPING?"DEVELOPING":(s.state==FM_CONFIRMED?"CONFIRMED":"DONE"))));
-         string fam = (s.family==MM_INVERSE?"INV ":"");
+          // Explicit fade direction: bull MM fades SHORT, bear MM fades LONG.
+          string side = (s.dir > 0 ? "SELL" : "BUY");
+          string st = (s.state==FM_PROJECTED?"MM":(s.state==FM_POTENTIAL?"POTENTIAL":(s.state==FM_DEVELOPING?"DEVELOPING":(s.state==FM_CONFIRMED?"CONFIRMED":"DONE"))));
+          string fam = (s.family==MM_INVERSE ? "INV " : (s.family==MM_RANGE ? "RNG " : (s.family==MM_CHANNEL ? "CH " : (s.family==MM_GAP ? "GAP " : ""))));
+          // v1.2 display-only score S=0..100 (never trades).
+          string sc = "";
+          if(cfg.ShowScore && count > 3 && atr_ref > 0)
+            {
+             int fdir = -s.dir;
+             double dt_atr = (s.dir > 0 ? (s.target - rates[1].high) / atr_ref : (rates[1].low - s.target) / atr_ref);
+             int q = CConfirmation::ScoreSignal(rates, count, 1, fdir, cfg, s.dir, atr_ref, dt_atr, s.confidence);
+             sc = StringFormat(" S=%d", q);
+            }
          // Stagger label price when targets cluster (your EURUSD #1/#2 case).
          double lp = s.target;
          for(int guard = 0; guard < 10; guard++)
@@ -102,8 +111,8 @@ public:
          int np = ArraySize(placed);
          ArrayResize(placed, np+1);
          placed[np] = lp;
-         EnsureLabel(px+"LABEL", TimeCurrent(), lp,
-                     StringFormat("%s%s %s #%d T=%.5f", fam, st, side, (int)s.id, s.target), tgtColor);
+          EnsureLabel(px+"LABEL", TimeCurrent(), lp,
+                      StringFormat("%s%s %s #%d T=%.5f%s", fam, st, side, (int)s.id, s.target, sc), tgtColor);
          // Directional arrow at the signal bar for DEVELOPING/CONFIRMED/COMPLETED.
          if(s.state==FM_DEVELOPING || s.state==FM_CONFIRMED || s.state==FM_COMPLETED)
            {

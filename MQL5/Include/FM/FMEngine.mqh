@@ -39,12 +39,13 @@ public:
   };
 
 class CFMEngine
-  {
+   {
 private:
-   CFMSetup          m_setups[];
-   long              m_next_id;
-   CLegEqualityMM    m_mm;
-   CContextClassifier m_ctx;
+    CFMSetup          m_setups[];
+    long              m_next_id;
+    CLegEqualityMM    m_mm;
+    CChannelMM        m_ch;   // v1.2 channel continuation
+    CContextClassifier m_ctx;
    CLogger          *m_log;
 
    void EvictIfNeeded(const CFMConfig &cfg, const MqlRates &rates[], int count)
@@ -65,6 +66,7 @@ private:
       for(int i = 0; i < ArraySize(m_setups); i++)
         {
          if(m_setups[i].b0.bar==p.b0.bar && m_setups[i].dir==p.dir &&
+            m_setups[i].family==p.family &&
             MathAbs(m_setups[i].target-p.target) < _Point*2 &&
             m_setups[i].state!=FM_INVALIDATED) return true;
         }
@@ -86,15 +88,38 @@ private:
      }
 
 public:
-   CFMEngine(): m_next_id(1), m_log(NULL) {}
-   void SetLogger(CLogger *l) { m_log=l; }
-   void Reset() { ArrayResize(m_setups, 0); m_next_id=1; }
-   int ActiveCount() const { return ArraySize(m_setups); }
-   bool GetSetup(int i, CFMSetup &s) const
-     {
-      if(i<0||i>=ArraySize(m_setups)) return false;
-      s=m_setups[i]; return true;
-     }
+    CFMEngine(): m_next_id(1), m_log(NULL) {}
+    void SetLogger(CLogger *l) { m_log=l; }
+    void Reset() { ArrayResize(m_setups, 0); m_next_id=1; }
+    int ActiveCount() const { return ArraySize(m_setups); }
+    bool GetSetup(int i, CFMSetup &s) const
+      {
+       if(i<0||i>=ArraySize(m_setups)) return false;
+       s=m_setups[i]; return true;
+      }
+    // v3 EA reuse (execution-free): export read-only snapshots for an EA in a
+    // separate repo — indicator repo never trades. EA reads DATA buffers or
+    // includes FMEngine.mqh and calls ActiveSnapshots().
+    int ActiveSnapshots(FMSetupSnapshot &out[]) const
+      {
+       int n = ArraySize(m_setups);
+       ArrayResize(out, n);
+       for(int i = 0; i < n; i++)
+         {
+          out[i].id = m_setups[i].id;
+          out[i].family = m_setups[i].family;
+          out[i].dir = m_setups[i].dir;
+          out[i].a0_price = m_setups[i].a0.price;
+          out[i].a1_price = m_setups[i].a1.price;
+          out[i].b0_price = m_setups[i].b0.price;
+          out[i].target = m_setups[i].target;
+          out[i].state = m_setups[i].state;
+          out[i].created_bar = m_setups[i].bars_since_creation;
+          out[i].context = m_setups[i].context;
+          out[i].confidence = m_setups[i].confidence;
+         }
+       return n;
+      }
 
    // Form projections from confirmed swings (call after Swings.Update).
    // swings[] chrono order (oldest→newest).
@@ -105,20 +130,49 @@ public:
       if(n < 3) return;
       // try most recent triples only (bounded work): last 6 swings
       int start = (n > 8 ? n - 8 : 0);
-      for(int i = start; i + 2 < n; i++)
-        {
-         Projection p; p.valid=false;
-         double aref = atr.At(swings[i+1].bar);
-         if(aref <= 0) continue;
-         if(m_mm.Project(swings[i], swings[i+1], swings[i+2], cfg, aref, p))
-           {
-            if(!SameProjection(p))
-              {
-               AddProjection(p, tnow);
-               if(m_log!=NULL) m_log.Debug(StringFormat("new projection id=%d dir=%d T=%.5f", (int)(m_next_id-1), p.dir, p.target));
-              }
-           }
-        }
+       for(int i = start; i + 2 < n; i++)
+         {
+          Projection p; p.valid=false;
+          double aref = atr.At(swings[i+1].bar);
+          if(aref <= 0) continue;
+          if(m_mm.Project(swings[i], swings[i+1], swings[i+2], cfg, aref, p))
+            {
+             if(!SameProjection(p))
+               {
+                AddProjection(p, tnow);
+                if(m_log!=NULL) m_log.Debug(StringFormat("new projection id=%d dir=%d T=%.5f", (int)(m_next_id-1), p.dir, p.target));
+               }
+            }
+          // v1.2 channel continuation (mutually exclusive depth band)
+          Projection pc; pc.valid=false;
+          if(cfg.EnableChannelMM && m_ch.Project(swings[i], swings[i+1], swings[i+2], cfg, aref, pc))
+            {
+             if(!SameProjection(pc)) AddProjection(pc, tnow);
+            }
+         }
+       // v1.2 range-height + gap families scan the two newest closed bars only
+       // (bounded work: breakout/gap is a property of the newest bar).
+       if(cfg.EnableRangeMM || cfg.EnableGapMM)
+         {
+          for(int b = 1; b <= 2; b++)
+            {
+             if(b >= count) break;
+             double aref = atr.At(b);
+             if(aref <= 0) continue;
+             if(cfg.EnableRangeMM)
+               {
+                Projection pr; pr.valid=false;
+                if(CRangeHeightMM::Project(rates, count, b, cfg, aref, pr))
+                   if(!SameProjection(pr)) AddProjection(pr, tnow);
+               }
+             if(cfg.EnableGapMM)
+               {
+                Projection pg; pg.valid=false;
+                if(CGapMM::Project(rates, count, b, cfg, aref, pg))
+                   if(!SameProjection(pg)) AddProjection(pg, tnow);
+               }
+            }
+         }
       // inverse family: build LegInfo from last legs
       if(cfg.EnableInverseMM)
         {
@@ -136,7 +190,7 @@ public:
                if(!SameProjection(p)) AddProjection(p, tnow);
            }
         }
-      // enforce cap placeholder (real eviction after update)
+      EvictIfNeeded(cfg, rates, count);
      }
 
    // Advance state machine one closed bar. `b` = newest closed shift (=1).
@@ -180,10 +234,10 @@ public:
                 if(!veto && dist >= 0 && dist <= approach)
                   { m_setups[i].state=FM_POTENTIAL; m_setups[i].state_bar_age=0; m_setups[i].signal_time=rates[b].time; }
                 break;
-             case FM_POTENTIAL:
-                if(MathAbs(extreme - m_setups[i].target) <= tol)
-                  {
-                   if(CConfirmation::ExhaustionAny(rates, count, b, m_setups[i].dir, a))
+              case FM_POTENTIAL:
+                 if(MathAbs(extreme - m_setups[i].target) <= tol)
+                   {
+                    if(CConfirmation::ExhaustionAnyCfg(rates, count, b, m_setups[i].dir, a, cfg.MinPushes, cfg.UseWedgeExhaustion))
                      { m_setups[i].state=FM_DEVELOPING; m_setups[i].state_bar_age=0; m_setups[i].signal_time=rates[b].time; }
                   }
                 else if(dist < 0 || dist > approach + tol)
@@ -196,9 +250,11 @@ public:
              case FM_DEVELOPING:
                {
                 int f = -m_setups[i].dir;
-                // signal bar may be current bar b (closed) — must be within tol of target
+                // signal bar must be the current closed bar b within tol of target
+                // (SPEC §6; mirrors Python: tol here, 2*tol only for the
+                // previous-bar delayed follow-through path below).
                 double sigExtreme = useClosePx ? bar.close : ((m_setups[i].dir > 0) ? bar.high : bar.low);
-                bool nearT = (MathAbs(sigExtreme - m_setups[i].target) <= tol + approach*0.0 + tol);
+                bool nearT = (MathAbs(sigExtreme - m_setups[i].target) <= tol);
                 if(CConfirmation::IsSignalBar(rates, count, b, f, cfg) && nearT)
                   {
                    bool ok = true;
@@ -246,6 +302,7 @@ public:
          w++;
         }
       ArrayResize(m_setups, w);
+      EvictIfNeeded(cfg, rates, count);
      }
 
    // Mark alerted; returns true if this (id,state) was not yet alerted.

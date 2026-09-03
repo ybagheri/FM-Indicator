@@ -1,4 +1,4 @@
-# ARCHITECTURE — FM Indicator v1
+# ARCHITECTURE — FM Indicator v1.2 + v2 research
 
 ## 1. Layout
 
@@ -45,12 +45,16 @@ Tick with no new closed bar: only optional intrabar POTENTIAL preview
 - `CSwingDetector`: `AddBar()`; outputs `Swing{index, price, dir, confirmed_bar}`.
   Internal pending buffer of size k; never exposes unconfirmed.
 - `CMeasuredMove : CMeasuredMoveBase` with subclasses
-  `CLegEqualityMM` (v1) reserving `CRangeHeightMM`, `CChannelMM`, `CGapMM`.
+  `CLegEqualityMM` (v1) + `CRangeHeightMM` (static, v1.2), `CChannelMM` (v1.2),
+  `CGapMM` (static, v1.2). Dedup key `(b0.bar, dir, family, target)`.
 - `CFMSetup`: `{id, family, dir, A0,A1,B0, target, state, created_bar,
   state_bar[3], alerted[3], context}` + `TransitionTo()` guard.
 - `CFMEngine`: `Update(closed_bar)` loop over ≤ MaxActiveSetups, nearest-first
   eviction; owns id counter; exposes active list to visualizer/buffers.
 - `CConfirmation`: stateless pure functions → unit-testable.
+  v1.1: `IsSignalBar` accepts newest closed bar; delayed follow-through path.
+  v1.2: `PushCount`/`IsWedge` first-class, `ExhaustionAnyCfg(minPushes,useWedge)`,
+  `ScoreSignal` 0–100 display-only.
 - `CVisualizer`: `Sync(setups)` diffs desired vs. existing `FM_*` objects.
 - `CAlertManager`: `Fire(id, state, text)` with sent-set + bar throttle.
 - `CLogger`: level-gated `PrintFormat`, retrospective gap labels only at DEBUG.
@@ -70,9 +74,13 @@ bar (prevents same-bar POTENTIAL→CONFIRMED jumps that would hide history).
   LABEL updated at each transition, all deleted at INVALIDATED/COMPLETED
   expiry or `OnDeinit`/symbol-timeframe change (`ObjectsDeleteAll("FM_")`).
 
-## 6. Extension points (no rewrite for v2)
+## 6. Extension points (v1.2/v2 implemented; v3 reserved)
 
-New MM families subclass `CMeasuredMoveBase::Project()`; new confirmation
-modes implement `IConfirmationRule`; context modes extend enum. EA reuse:
-`#include <FM/FMEngine.mqh>` + read DATA buffers or call
-`CFMEngine::Active()` — no chart code required.
+v1.2 families subclass `CMeasuredMoveBase::Project()` (range/gap as static
+`Project(rates,count,bar,…)` since they scan bars, not swing triples);
+confirmation modes extend `CConfirmation`; context modes extend enum. v2:
+`MTFBias()` + `ExportSignalRow()` in the indicator (read-only/export only),
+`backtest_run`/`mae_mfe`/`export_signals_csv`/`mtf_bias` in the Python mirror.
+EA reuse: `#include <FM/FMEngine.mqh>` + read DATA buffers or call
+`CFMEngine::ActiveSnapshots()` — no chart code required. v3 (separate repo):
+execution EA + optimization/walk-forward framework.

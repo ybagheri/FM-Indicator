@@ -25,6 +25,16 @@ public:
    bool              RequireFollowThrough;
    bool              EnableInverseMM;
    int               FailedBOBars;
+   // v1.2 families (default OFF to preserve v1 setup count; enable per preset)
+   bool              EnableRangeMM;
+   int               RangeLookback;
+   bool              EnableChannelMM;
+   bool              EnableGapMM;
+   double            MinGapATRMult;
+   // v1.2 exhaustion: min consecutive pushes + wedge as first-class inputs
+   int               MinPushes;
+   bool              UseWedgeExhaustion;
+   bool              ShowScore;      // append S=0..100 to labels (display only)
    ENUM_CTX_FILTER   ContextFilter;
    ENUM_FM_PRICE_MODE PriceMode;   // HIGHLOW = candles, CLOSE = line chart
    int               MaxActiveSetups;
@@ -58,6 +68,9 @@ public:
       SignalClosePct=0.50; MinBodyRatio=0.30; MaxWickRatio=0.60;
       RequireEngulf=false; RequireFollowThrough=false;
       EnableInverseMM=true; FailedBOBars=5;
+      EnableRangeMM=false; RangeLookback=50;
+      EnableChannelMM=false; EnableGapMM=false; MinGapATRMult=1.0;
+      MinPushes=3; UseWedgeExhaustion=true; ShowScore=true;
       ContextFilter=CTX_LOG_ONLY; PriceMode=FM_PRICE_HIGHLOW;
       MaxActiveSetups=20; MaxBarsForward=100;
       UseIntrabarPotential=false; AtrPeriod=14;
@@ -107,7 +120,12 @@ public:
       if(MaxActiveSetups>100) { MaxActiveSetups=100; ok=false; }
       if(AtrPeriod<2) { AtrPeriod=2; ok=false; }
       if(FailedBOBars<1) { FailedBOBars=1; ok=false; }
-      return ok;
+      if(RangeLookback<10) { RangeLookback=10; ok=false; }
+      if(RangeLookback>200) { RangeLookback=200; ok=false; }
+      if(MinGapATRMult<0.25) { MinGapATRMult=0.25; ok=false; }
+      if(MinPushes<2) { MinPushes=2; ok=false; }
+      if(MinPushes>5) { MinPushes=5; ok=false; }
+       return ok;
      }
   };
 

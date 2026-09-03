@@ -1,4 +1,5 @@
-; FM Balanced (defaults, SPEC §1) — H1/H4 majors
+; FM Families v1.2 — all MM families ON (regular + inverse + range + channel + gap)
+; Balanced base with families enabled; expect more setups — use score filter on chart.
 InpSwingK=3
 InpMinLegATRMult=1.0
 InpMinLegBars=3
@@ -16,10 +17,10 @@ InpRequireEngulf=0
 InpRequireFollowThrough=0
 InpEnableInverseMM=1
 InpFailedBOBars=5
-InpEnableRangeMM=0
+InpEnableRangeMM=1
 InpRangeLookback=50
-InpEnableChannelMM=0
-InpEnableGapMM=0
+InpEnableChannelMM=1
+InpEnableGapMM=1
 InpMinGapATRMult=1.0
 InpMinPushes=3
 InpUseWedgeExhaustion=1
