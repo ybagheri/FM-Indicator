@@ -52,6 +52,10 @@ public:
     double            MinDoubleTroughATRMult;
     int               MicroDoubleBars;
     bool              EnablePullbackPatterns; // master switch; false = layer idle
+    // Phase 3 market-state engine (docs/MARKET_STATE.md §1)
+    int               StateLookback;
+    int               StateOverlapBars;
+    bool              EnableMarketState;  // master switch; false = layer idle
    ENUM_CTX_FILTER   ContextFilter;
    ENUM_FM_PRICE_MODE PriceMode;   // HIGHLOW = candles, CLOSE = line chart
    int               MaxActiveSetups;
@@ -93,6 +97,7 @@ public:
        BarbwireMinOverlap=3; PressureLookback=10; EnableBarAnalysis=true;
        MinPullbackDepthATRMult=0.50; DoubleTopTolATRMult=0.25; MaxDoubleBars=20;
        MinDoubleTroughATRMult=0.50; MicroDoubleBars=5; EnablePullbackPatterns=true;
+       StateLookback=20; StateOverlapBars=10; EnableMarketState=true;
       ContextFilter=CTX_LOG_ONLY; PriceMode=FM_PRICE_HIGHLOW;
       MaxActiveSetups=20; MaxBarsForward=100;
       UseIntrabarPotential=false; AtrPeriod=14;
@@ -166,6 +171,10 @@ public:
        if(MinDoubleTroughATRMult>2.0) { MinDoubleTroughATRMult=2.0; ok=false; }
        if(MicroDoubleBars<3) { MicroDoubleBars=3; ok=false; }
        if(MicroDoubleBars>10) { MicroDoubleBars=10; ok=false; }
+       if(StateLookback<10) { StateLookback=10; ok=false; }
+       if(StateLookback>100) { StateLookback=100; ok=false; }
+       if(StateOverlapBars<5) { StateOverlapBars=5; ok=false; }
+       if(StateOverlapBars>20) { StateOverlapBars=20; ok=false; }
        return ok;
      }
   };

@@ -33,6 +33,20 @@ def _none_double(direction):
                 price1=0.0, price2=0.0, micro=False)
 
 
+def trend_gap(bars, idx):
+    """Raw EMA20−EMA50 gap over closes[0..idx]; <50 closes → 0.0."""
+    if idx < 0 or idx >= len(bars):
+        return 0.0
+    if idx + 1 < 50:
+        return 0.0
+    k20, k50 = 2.0 / 21.0, 2.0 / 51.0
+    e20 = e50 = bars[0]['c']
+    for i in range(1, idx + 1):
+        e20 = bars[i]['c'] * k20 + e20 * (1.0 - k20)
+        e50 = bars[i]['c'] * k50 + e50 * (1.0 - k50)
+    return e20 - e50
+
+
 def trend_dir(bars, idx, last_closed, atr, cfg=None):
     """EMA20/EMA50 gap on closes ending at idx. Needs 50+ closes, else 0."""
     cfg = cfg or PVCfg()
@@ -40,14 +54,7 @@ def trend_dir(bars, idx, last_closed, atr, cfg=None):
         return 0
     if not atr or atr <= 0:
         return 0
-    if idx + 1 < 50:
-        return 0
-    k20, k50 = 2.0 / 21.0, 2.0 / 51.0
-    e20 = e50 = bars[0]['c']
-    for i in range(1, idx + 1):
-        e20 = bars[i]['c'] * k20 + e20 * (1.0 - k20)
-        e50 = bars[i]['c'] * k50 + e50 * (1.0 - k50)
-    gap = (e20 - e50) / atr
+    gap = trend_gap(bars, idx) / atr
     if gap > 0.4:
         return +1
     if gap < -0.4:

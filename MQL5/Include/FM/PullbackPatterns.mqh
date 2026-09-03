@@ -33,14 +33,13 @@ struct DoubleSignal
 class CPullbackPatterns
   {
 public:
-   // Trend gate: EMA20/EMA50 gap on closes ending at closed bar b.
-   // Needs 50+ closed bars (count-b >= 50); atr<=0 → 0. See spec §2.
-   static int TrendDir(const MqlRates &rates[], int count, int b, double atr,
-                       const CFMConfig &cfg)
+   // Raw EMA20−EMA50 gap on closes ending at closed bar b (price units).
+   // Oldest-seed EMA (seed = oldest close, forward to b); <50 closes → 0.
+   // Shared with the Phase-3 market-state engine (single EMA convention).
+   static double TrendGap(const MqlRates &rates[], int count, int b)
      {
-      if(b < 1 || b >= count) return 0;
-      if(atr <= 0) return 0;
-      if(count - b < 50) return 0;
+      if(b < 1 || b >= count) return 0.0;
+      if(count - b < 50) return 0.0;
       double k20 = 2.0 / 21.0, k50 = 2.0 / 51.0;
       double e20 = rates[count-1].close, e50 = e20;
       for(int i = count - 2; i >= b; i--)
@@ -48,7 +47,17 @@ public:
          e20 = rates[i].close * k20 + e20 * (1.0 - k20);
          e50 = rates[i].close * k50 + e50 * (1.0 - k50);
         }
-      double gap = (e20 - e50) / atr;
+      return (e20 - e50);
+     }
+
+   // Trend gate: EMA20/EMA50 gap on closes ending at closed bar b.
+   // Needs 50+ closed bars (count-b >= 50); atr<=0 → 0. See spec §2.
+   static int TrendDir(const MqlRates &rates[], int count, int b, double atr,
+                       const CFMConfig &cfg)
+     {
+      if(b < 1 || b >= count) return 0;
+      if(atr <= 0) return 0;
+      double gap = TrendGap(rates, count, b) / atr;
       if(gap > 0.4) return +1;
       if(gap < -0.4) return -1;
       return 0;

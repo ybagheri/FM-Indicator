@@ -1,4 +1,4 @@
-# TESTING — FM Indicator v1.2 + v2 research + Phase-1 bar engine + Phase-2 pullbacks
+# TESTING — FM Indicator v1.2 + v2 research + Phase-1/2/3 engines
 
 ## Method
 
@@ -6,11 +6,12 @@
   identical synthetic series.
 - Bar oracle: `tests/bar_analyzer.py` (1:1 mirror of BAR_BY_BAR_ENGINE.md).
 - Pullback oracle: `tests/pullback_patterns.py` (1:1 mirror of PULLBACK_PATTERNS.md).
-- Run: `python3 -m pytest tests/ -q` → 36 tests, ALL PASS (19 FM + 7 bar + 10 pullback;
-  or `python3 tests/test_fm.py` / `python3 tests/test_bar.py` / `python3 tests/test_pullback.py` via `__main__`).
+- State oracle: `tests/market_state.py` (1:1 mirror of MARKET_STATE.md).
+- Run: `python3 -m pytest tests/ -q` → 45 tests, ALL PASS (19 FM + 7 bar +
+  10 pullback + 9 state; or per-file via `__main__`).
 - MQL5 compile: MetaEditor on Windows (F7). Linux env has no
   `metaeditor.exe`/`wine`; static check = balanced-delimiter scan
-  (comment/string-stripped) over all 15 MQL5 files → OK.
+  (comment/string-stripped) over all 16 MQL5 files → OK.
 
 ## Cases → expected
 
@@ -45,6 +46,15 @@
 | 27 | Double-bottom mirror | found; no-trough variant silent | PASS |
 | 28 | Micro double (top+bottom) | found micro:true; shallow dip rejected | PASS |
 | 29 | Freeze + no-look-ahead + safety | identical after extension; zero-ATR/tiny-history safe | PASS |
+| 30 | Bull trend state | BULL_TREND, pcts sum 100, trend+pressure evidence | PASS |
+| 31 | Bear trend mirror | BEAR_TREND, pcts sum 100 | PASS |
+| 32 | Bull channel grind | BULL_CHANNEL on overlap+bounded+lean | PASS |
+| 33 | Trading range | TRADING_RANGE, balanced pressure | PASS |
+| 34 | Breakout mode | tightening tips RANGE→BOM | PASS |
+| 35 | Transition weak floor | all raws <1.0 → TRANSITION, pcts kept | PASS |
+| 36 | Unknown tiny history | UNKNOWN, pcts all 0 | PASS |
+| 37 | State freeze + safety | identical after extension; zero-ATR/disabled safe | PASS |
+| 38 | Pcts sum + determinism | sum==100 + identical re-run on 3 regimes | PASS |
 
 ## Coverage map (prompt §TESTING 1–12 + v1.2/v2)
 
@@ -68,6 +78,11 @@ L1/L2 mirror + bull-side silence; gate-0 suppression; chop-with-gate-forced
 (H1-alone risk record); swing double-top in-tol (most-recent wins) + rejected
 (tol/trough/distance); double-bottom mirror; micro top+bottom (halved trough);
 freeze/no-look-ahead/zero-ATR/tiny-history safety.
+Phase 3 states (`test_state.py`, 9 suites): bull/bear trend; bull-channel
+grind; trading range; breakout-mode (tightening tips RANGE→BOM); transition
+weak floor (all raws <1.0, pcts still published for Phase-8 conflict rule);
+unknown tiny history; freeze/no-look-ahead/zero-ATR/disabled safety;
+pct-sum-100 + winner determinism across regimes.
 
 ## Reproduce
 

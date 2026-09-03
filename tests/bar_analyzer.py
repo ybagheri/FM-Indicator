@@ -154,7 +154,7 @@ def bar_analyze(bars, idx, last_closed, atr, cfg=None):
         if _body(bars[tail]) / rr < cfg.doji_max_body:
             any_doji = True
     f['barbwire'] = ovn >= cfg.barbwire_min_overlap and any_doji
-    if idx - 5 >= 0:
+    if idx - 4 >= 0:
         w = sorted(bars[i]['h'] - bars[i]['l'] for i in range(idx-4, idx))
         med = (w[1] + w[2]) * 0.5
         f['tightening'] = (bars[idx]['h'] - bars[idx]['l']) < med

@@ -37,6 +37,7 @@
 #include <FM/Swings.mqh>
 #include <FM/BarAnalyzer.mqh>
 #include <FM/PullbackPatterns.mqh>
+#include <FM/MarketState.mqh>
 #include <FM/MeasuredMove.mqh>
 #include <FM/FMEngine.mqh>
 #include <FM/Visualizer.mqh>
@@ -79,6 +80,9 @@ input int    InpMaxDoubleBars        = 20;    // Phase 2: max bars between doubl
 input double InpMinDoubleTroughATRMult = 0.50; // Phase 2: min trough separation (xATR)
 input int    InpMicroDoubleBars      = 5;     // Phase 2: micro-double window (newest closed bars)
 input bool   InpEnablePullbackPatterns = true; // Phase 2: pullback/double layer (read-only)
+input int    InpStateLookback        = 20;    // Phase 3: range-height window (bars)
+input int    InpStateOverlapBars     = 10;    // Phase 3: body-overlap window (bars)
+input bool   InpEnableMarketState    = true;  // Phase 3: market-state engine (read-only)
 input int    InpMTFTrendTFMinutes   = 0;      // v2 MTF overlay: 0=off, else higher-TF minutes
 input bool   InpExportCSV           = false;  // v2: write signals CSV on new CONFIRMED
 input string InpCSVFile             = "FM_signals.csv";
@@ -148,6 +152,8 @@ void ApplyInputsToConfig()
    g_cfg.MinDoubleTroughATRMult=InpMinDoubleTroughATRMult;
    g_cfg.MicroDoubleBars=InpMicroDoubleBars;
    g_cfg.EnablePullbackPatterns=InpEnablePullbackPatterns;
+   g_cfg.StateLookback=InpStateLookback; g_cfg.StateOverlapBars=InpStateOverlapBars;
+   g_cfg.EnableMarketState=InpEnableMarketState;
    g_cfg.ContextFilter=InpContextFilterMode;
    g_cfg.PriceMode=InpPriceMode;
    g_cfg.MaxActiveSetups=InpMaxActiveSetups; g_cfg.MaxBarsForward=InpMaxBarsForward;
@@ -314,6 +320,12 @@ int OnCalculate(const int rates_total,
           if(mTop.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(mTop);
           if(mBot.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(mBot);
           g_log.Debug(pbMsg);
+         }
+       // Phase 3 market-state engine (read-only; never gates the state machine).
+       if(g_cfg.EnableMarketState)
+         {
+          MarketState ms = CMarketState::Analyze(rates, rates_total, 1, g_atr.At(1), g_cfg);
+          g_log.Debug(CMarketState::Describe(ms, 1));
          }
       // v2 MTF overlay (read-only annotation; never gates the state machine).
       if(InpMTFTrendTFMinutes > 0)

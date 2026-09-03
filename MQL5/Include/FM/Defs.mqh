@@ -53,6 +53,20 @@ enum ENUM_FM_PRICE_MODE
    FM_PRICE_CLOSE=1    // line-chart mode: swings/legs/targets/distances on Close
   };
 
+// Phase 3 market-state engine (docs/MARKET_STATE.md §7). BO / pullback-in-
+// trend / reversal members reserved for Phases 4-5 (not added now).
+enum ENUM_MARKET_STATE
+  {
+   MS_UNKNOWN=0,
+   MS_BULL_TREND=1,
+   MS_BEAR_TREND=2,
+   MS_BULL_CHANNEL=3,
+   MS_BEAR_CHANNEL=4,
+   MS_TRADING_RANGE=5,
+   MS_BREAKOUT_MODE=6,
+   MS_TRANSITION=7
+  };
+
 struct SwingPoint
   {
    int               bar;            // closed-bar shift at swing extreme

@@ -42,6 +42,9 @@ Phase-1 bar engine (read-only): per-closed-bar features
 logged at DEBUG, never gating signals — see `docs/BAR_BY_BAR_ENGINE.md`.
 Phase-2 pullback layer (read-only): EMA-gated H1/H2/L1/L2 + swing/micro
 doubles logged at DEBUG, never gating signals — see `docs/PULLBACK_PATTERNS.md`.
+Phase-3 market-state engine (read-only): TREND/CHANNEL/RANGE/BREAKOUT_MODE
+scores (unit weights, pcts sum 100) logged at DEBUG, never gating signals —
+see `docs/MARKET_STATE.md`.
 **Price mode** `InpPriceMode`: `High/Low` (candles, default) or `Close`
 (line chart — swings/legs/targets/distances on closes, like mobile
 line-chart MM analysis). Families v1.2 (default OFF): `InpEnableRangeMM` /
@@ -99,6 +102,7 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 
 `docs/RESEARCH.md` · `docs/BROOKS_CONCEPTS.md` ·
 `docs/BAR_BY_BAR_ENGINE.md` · `docs/PULLBACK_PATTERNS.md` ·
+`docs/MARKET_STATE.md` ·
 `docs/MARKET_CONTEXT.md` ·
 `docs/SYSTEMATIC_SPECIFICATION.md` ·
 `docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/FUTURE_ROADMAP.md`
