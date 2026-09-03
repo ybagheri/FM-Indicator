@@ -11,6 +11,7 @@ MQL5/Include/FM/
    BarAnalyzer.mqh   CBarAnalyzer (Phase 1: pure per-closed-bar features + Describe)
    PullbackPatterns.mqh CPullbackPatterns (Phase 2: TrendDir + H1/H2/L1/L2 + swing/micro doubles, read-only)
    MarketState.mqh   CMarketState (Phase 3: TREND/CHANNEL/RANGE/BOM scores + Describe, read-only)
+   BreakoutEngine.mqh CBreakoutEngine (Phase 4: BO events + FOLLOW/FAILED + trap flag, read-only)
   Swings.mqh        CSwingDetector (fractal-k, confirmed-only output)
   Context.mqh       CContextClassifier (Trend/Range/Transition + confidence)
   MeasuredMove.mqh  CLeg, CMeasuredMove (regular + inverse projection)
@@ -32,6 +33,7 @@ rates[] → CMarketData.Refresh (new-bar detect, freeze closes)
    → CATR.Update → CBarAnalyzer.Analyze (Phase 1 read-only DEBUG log)
    → CPullbackPatterns (Phase 2 read-only DEBUG log: TrendDir + H1/H2/L1/L2 + doubles)
    → CMarketState.Analyze (Phase 3 read-only DEBUG log: 6 state scores/pcts)
+   → CBreakoutEngine.Analyze (Phase 4 read-only DEBUG log when found)
    → CSwingDetector.Update (confirmed swings only)
   → CMeasuredMove.Project (legs → projections, inverse if enabled)
   → CContextClassifier.Update → CConfirmation.Evaluate
@@ -60,6 +62,10 @@ Tick with no new closed bar: only optional intrabar POTENTIAL preview
   largest-remainder pcts + argmax winner + weak-floor TRANSITION) +
   `Describe()`; reuses `TrendGap` + `PairOverlap` + `WindowStats` (one
   predicate source each); v1 `CContextClassifier` untouched (Phase 3, read-only).
+- `CBreakoutEngine`: static pure `EventAt` (N-bar + swing refs, swing tie-break)
+  + `Analyze` (most-recent event in FollowBars → PENDING/FOLLOW/FAILED with
+  FAILED precedence + second-leg `trapArmed` scan) + `Describe()`; v1
+  `CInverseMMHelper` untouched, no targets emitted (Phase 4, read-only).
 - `CSwingDetector`: `AddBar()`; outputs `Swing{index, price, dir, confirmed_bar}`.
   Internal pending buffer of size k; never exposes unconfirmed.
 - `CMeasuredMove : CMeasuredMoveBase` with subclasses

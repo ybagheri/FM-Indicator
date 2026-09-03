@@ -39,6 +39,8 @@
   (`PULLBACK_PATTERNS.md` + `PullbackPatterns.mqh` + mirror + 10 tests, read-only hook).
 - [x] Phase 3: market-state engine (TREND/CHANNEL/RANGE/BREAKOUT_MODE scores)
   (`MARKET_STATE.md` + `MarketState.mqh` + mirror + 9 tests, read-only hook).
+- [x] Phase 4: breakout + generalized failed-breakout/trap engine
+  (`BREAKOUT_ENGINE.md` + `BreakoutEngine.mqh` + mirror + 9 tests, read-only hook).
 - Phase 3: market-state engine (TREND/CHANNEL/RANGE/BREAKOUT_MODE scores).
 - Phase 4: breakout + generalized failed-breakout/trap engine.
 - Phase 5: pullback/reversal/MTR + dedicated exhaustion analyzer.

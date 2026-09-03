@@ -67,6 +67,16 @@ enum ENUM_MARKET_STATE
    MS_TRANSITION=7
   };
 
+// Phase 4 breakout lifecycle (docs/BREAKOUT_ENGINE.md §7). Full breakout
+// setup states (BULL_BREAKOUT etc.) belong to the Phase-7 setup engine.
+enum ENUM_BO_OUTCOME
+  {
+   BO_NONE=0,
+   BO_PENDING=1,
+   BO_FOLLOW_THROUGH=2,
+   BO_FAILED=3
+  };
+
 struct SwingPoint
   {
    int               bar;            // closed-bar shift at swing extreme

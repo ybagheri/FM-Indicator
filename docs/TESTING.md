@@ -1,4 +1,4 @@
-# TESTING — FM Indicator v1.2 + v2 research + Phase-1/2/3 engines
+# TESTING — FM Indicator v1.2 + v2 research + Phase-1..4 engines
 
 ## Method
 
@@ -7,11 +7,12 @@
 - Bar oracle: `tests/bar_analyzer.py` (1:1 mirror of BAR_BY_BAR_ENGINE.md).
 - Pullback oracle: `tests/pullback_patterns.py` (1:1 mirror of PULLBACK_PATTERNS.md).
 - State oracle: `tests/market_state.py` (1:1 mirror of MARKET_STATE.md).
-- Run: `python3 -m pytest tests/ -q` → 45 tests, ALL PASS (19 FM + 7 bar +
-  10 pullback + 9 state; or per-file via `__main__`).
+- Breakout oracle: `tests/breakout.py` (1:1 mirror of BREAKOUT_ENGINE.md).
+- Run: `python3 -m pytest tests/ -q` → 54 tests, ALL PASS (19 FM + 7 bar +
+  10 pullback + 9 state + 9 breakout; or per-file via `__main__`).
 - MQL5 compile: MetaEditor on Windows (F7). Linux env has no
   `metaeditor.exe`/`wine`; static check = balanced-delimiter scan
-  (comment/string-stripped) over all 16 MQL5 files → OK.
+  (comment/string-stripped) over all 17 MQL5 files → OK.
 
 ## Cases → expected
 
@@ -55,6 +56,15 @@
 | 36 | Unknown tiny history | UNKNOWN, pcts all 0 | PASS |
 | 37 | State freeze + safety | identical after extension; zero-ATR/disabled safe | PASS |
 | 38 | Pcts sum + determinism | sum==100 + identical re-run on 3 regimes | PASS |
+| 39 | Bull BO pending at newest | event at idx, ref NBAR, decideBar −1 | PASS |
+| 40 | Bull follow-through | hold beyond ref → FOLLOW | PASS |
+| 41 | Bull failed precedence | extend-then-reverse → FAILED | PASS |
+| 42 | Bear mirror | bear FOLLOW, NBAR ref | PASS |
+| 43 | Swing ref tie-break | swing wins, newest swing price | PASS |
+| 44 | Tolerance poke | inside tol → none | PASS |
+| 45 | Second-leg trap armed | fail then re-break → TRAP + PENDING | PASS |
+| 46 | Stale BO outside window | beyond FollowBars → none | PASS |
+| 47 | BO freeze + safety | identical after extension; zero-ATR/tiny/disabled safe | PASS |
 
 ## Coverage map (prompt §TESTING 1–12 + v1.2/v2)
 
@@ -83,6 +93,10 @@ grind; trading range; breakout-mode (tightening tips RANGE→BOM); transition
 weak floor (all raws <1.0, pcts still published for Phase-8 conflict rule);
 unknown tiny history; freeze/no-look-ahead/zero-ATR/disabled safety;
 pct-sum-100 + winner determinism across regimes.
+Phase 4 breakouts (`test_breakout.py`, 9 suites): bull pending/follow/failed
+(FAILED precedence); bear mirror; swing-ref tie-break; tolerance poke silent;
+second-leg trap armed; stale BO outside FollowBars silent;
+freeze/no-look-ahead/zero-ATR/tiny-history/disabled safety.
 
 ## Reproduce
 

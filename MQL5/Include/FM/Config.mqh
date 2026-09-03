@@ -56,6 +56,12 @@ public:
     int               StateLookback;
     int               StateOverlapBars;
     bool              EnableMarketState;  // master switch; false = layer idle
+    // Phase 4 breakout engine (docs/BREAKOUT_ENGINE.md §1)
+    int               BOLookback;
+    double            BOToleranceATRMult;
+    int               BOFollowBars;
+    int               BOTrapLookback;
+    bool              EnableBreakout;     // master switch; false = layer idle
    ENUM_CTX_FILTER   ContextFilter;
    ENUM_FM_PRICE_MODE PriceMode;   // HIGHLOW = candles, CLOSE = line chart
    int               MaxActiveSetups;
@@ -98,6 +104,8 @@ public:
        MinPullbackDepthATRMult=0.50; DoubleTopTolATRMult=0.25; MaxDoubleBars=20;
        MinDoubleTroughATRMult=0.50; MicroDoubleBars=5; EnablePullbackPatterns=true;
        StateLookback=20; StateOverlapBars=10; EnableMarketState=true;
+       BOLookback=20; BOToleranceATRMult=0.10; BOFollowBars=5;
+       BOTrapLookback=20; EnableBreakout=true;
       ContextFilter=CTX_LOG_ONLY; PriceMode=FM_PRICE_HIGHLOW;
       MaxActiveSetups=20; MaxBarsForward=100;
       UseIntrabarPotential=false; AtrPeriod=14;
@@ -175,6 +183,14 @@ public:
        if(StateLookback>100) { StateLookback=100; ok=false; }
        if(StateOverlapBars<5) { StateOverlapBars=5; ok=false; }
        if(StateOverlapBars>20) { StateOverlapBars=20; ok=false; }
+       if(BOLookback<10) { BOLookback=10; ok=false; }
+       if(BOLookback>100) { BOLookback=100; ok=false; }
+       if(BOToleranceATRMult<0.0) { BOToleranceATRMult=0.0; ok=false; }
+       if(BOToleranceATRMult>0.5) { BOToleranceATRMult=0.5; ok=false; }
+       if(BOFollowBars<1) { BOFollowBars=1; ok=false; }
+       if(BOFollowBars>20) { BOFollowBars=20; ok=false; }
+       if(BOTrapLookback<5) { BOTrapLookback=5; ok=false; }
+       if(BOTrapLookback>100) { BOTrapLookback=100; ok=false; }
        return ok;
      }
   };

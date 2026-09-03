@@ -38,6 +38,7 @@
 #include <FM/BarAnalyzer.mqh>
 #include <FM/PullbackPatterns.mqh>
 #include <FM/MarketState.mqh>
+#include <FM/BreakoutEngine.mqh>
 #include <FM/MeasuredMove.mqh>
 #include <FM/FMEngine.mqh>
 #include <FM/Visualizer.mqh>
@@ -83,6 +84,11 @@ input bool   InpEnablePullbackPatterns = true; // Phase 2: pullback/double layer
 input int    InpStateLookback        = 20;    // Phase 3: range-height window (bars)
 input int    InpStateOverlapBars     = 10;    // Phase 3: body-overlap window (bars)
 input bool   InpEnableMarketState    = true;  // Phase 3: market-state engine (read-only)
+input int    InpBOLookback          = 20;    // Phase 4: Donchian reference window (bars)
+input double InpBOToleranceATRMult  = 0.10;  // Phase 4: close must clear ref by this xATR
+input int    InpBOFollowBars        = 5;     // Phase 4: active-breakout window (bars)
+input int    InpBOTrapLookback      = 20;    // Phase 4: prior-failure scan (bars)
+input bool   InpEnableBreakout      = true;  // Phase 4: breakout/trap engine (read-only)
 input int    InpMTFTrendTFMinutes   = 0;      // v2 MTF overlay: 0=off, else higher-TF minutes
 input bool   InpExportCSV           = false;  // v2: write signals CSV on new CONFIRMED
 input string InpCSVFile             = "FM_signals.csv";
@@ -154,6 +160,9 @@ void ApplyInputsToConfig()
    g_cfg.EnablePullbackPatterns=InpEnablePullbackPatterns;
    g_cfg.StateLookback=InpStateLookback; g_cfg.StateOverlapBars=InpStateOverlapBars;
    g_cfg.EnableMarketState=InpEnableMarketState;
+   g_cfg.BOLookback=InpBOLookback; g_cfg.BOToleranceATRMult=InpBOToleranceATRMult;
+   g_cfg.BOFollowBars=InpBOFollowBars; g_cfg.BOTrapLookback=InpBOTrapLookback;
+   g_cfg.EnableBreakout=InpEnableBreakout;
    g_cfg.ContextFilter=InpContextFilterMode;
    g_cfg.PriceMode=InpPriceMode;
    g_cfg.MaxActiveSetups=InpMaxActiveSetups; g_cfg.MaxBarsForward=InpMaxBarsForward;
@@ -326,6 +335,12 @@ int OnCalculate(const int rates_total,
          {
           MarketState ms = CMarketState::Analyze(rates, rates_total, 1, g_atr.At(1), g_cfg);
           g_log.Debug(CMarketState::Describe(ms, 1));
+         }
+       // Phase 4 breakout engine (read-only; never gates the state machine).
+       if(g_cfg.EnableBreakout)
+         {
+          BreakoutSignal bo = CBreakoutEngine::Analyze(rates, rates_total, 1, g_atr.At(1), sw, g_cfg);
+          if(bo.found) g_log.Debug(CBreakoutEngine::Describe(bo));
          }
       // v2 MTF overlay (read-only annotation; never gates the state machine).
       if(InpMTFTrendTFMinutes > 0)
