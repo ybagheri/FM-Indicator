@@ -8,6 +8,7 @@ MQL5/Include/FM/
   Config.mqh        CFMConfig (all Inp*), presets, validation
   MarketData.mqh    CBar, CMarketData (MT5 series copy, closed-bar discipline)
   ATR.mqh           CATR (Wilder)
+  BarAnalyzer.mqh   CBarAnalyzer (Phase 1: pure per-closed-bar features + Describe)
   Swings.mqh        CSwingDetector (fractal-k, confirmed-only output)
   Context.mqh       CContextClassifier (Trend/Range/Transition + confidence)
   MeasuredMove.mqh  CLeg, CMeasuredMove (regular + inverse projection)
@@ -26,7 +27,8 @@ docs/*.md            RESEARCH / SPEC / ARCH / TESTING / ROADMAP
 
 ```
 rates[] → CMarketData.Refresh (new-bar detect, freeze closes)
-  → CATR.Update → CSwingDetector.Update (confirmed swings only)
+  → CATR.Update → CBarAnalyzer.Analyze (Phase 1 read-only DEBUG log)
+  → CSwingDetector.Update (confirmed swings only)
   → CMeasuredMove.Project (legs → projections, inverse if enabled)
   → CContextClassifier.Update → CConfirmation.Evaluate
   → CFMEngine.Update (transitions, alert-once set, expiry)
@@ -42,6 +44,8 @@ Tick with no new closed bar: only optional intrabar POTENTIAL preview
 - `CFMConfig`: plain struct + `Validate()` clamping nonsense (e.g. Min>Max).
 - `CMarketData`: owns copied `MqlRates[]`, exposes `Closed(i)` with
   `i>=1` mapping; `LastClosed()`; `IsNewBar()`.
+- `CBarAnalyzer`: static pure `Analyze(rates,count,shift,atr,cfg)→BarFeatures`
+  + `Describe()` evidence string; no state, no future bars (Phase 1, read-only).
 - `CSwingDetector`: `AddBar()`; outputs `Swing{index, price, dir, confirmed_bar}`.
   Internal pending buffer of size k; never exposes unconfirmed.
 - `CMeasuredMove : CMeasuredMoveBase` with subclasses

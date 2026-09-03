@@ -49,6 +49,11 @@ Conventions:
 | `InpMinPushes` | int | 3 | v1.2: exhaustion push threshold 2–5 (SPEC §8) |
 | `InpUseWedgeExhaustion` | bool | true | v1.2: count shrinking-range wedge as exhaustion |
 | `InpShowScore` | bool | true | v1.2: append display-only S=0..100 to labels |
+| `InpDojiMaxBodyRatio` | double | 0.15 | Phase 1 bar engine: body/range below → doji |
+| `InpBigBarATRMult` | double | 2.0 | Phase 1: range ≥ this × ATR → big bar |
+| `InpSmallBarATRMult` | double | 0.5 | Phase 1: range < this × ATR → small bar |
+| `InpStrongClosePct` | double | 0.70 | Phase 1: close in extreme N% → strong close |
+| `InpEnableBarAnalysis` | bool | true | Phase 1: bar analyzer master switch (read-only) |
 | `InpMTFTrendTFMinutes` | int | 0 | v2: higher-TF overlay minutes, 0=off (LOG_ONLY) |
 | `InpExportCSV` | bool | false | v2: append CSV row per CONFIRMED |
 | `InpCSVFile` | string | FM_signals.csv | v2: CSV filename under MQL5/Files |

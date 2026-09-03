@@ -1,11 +1,12 @@
-# TESTING — FM Indicator v1.2 + v2 research
+# TESTING — FM Indicator v1.2 + v2 research + Phase-1 bar engine
 
 ## Method
 
 - Oracle: `tests/fm_engine.py` (1:1 mirror of SPEC). MQL5 must match it on
   identical synthetic series.
-- Run: `python3 -m pytest tests/ -q` → 19 tests, ALL PASS (or
-  `python3 tests/test_fm.py` → same 19 via `__main__`).
+- Bar oracle: `tests/bar_analyzer.py` (1:1 mirror of BAR_BY_BAR_ENGINE.md).
+- Run: `python3 -m pytest tests/ -q` → 26 tests, ALL PASS (19 FM + 7 bar;
+  or `python3 tests/test_fm.py` / `python3 tests/test_bar.py` via `__main__`).
 - MQL5 compile: MetaEditor on Windows (F7). Linux env has no
   `metaeditor.exe`/`wine`; static check = balanced-delimiter scan
   (comment/string-stripped) over all 13 MQL5 files → OK.
@@ -48,6 +49,9 @@ closed-bar freeze, shifts never rewritten. 11 No-look-ahead — test 1.
 12 Repaint — swing-price freeze + one-transition-per-bar.
 v1.2 — families (11–13), wedge counter + score (10, 14), newest-bar signal (15).
 v2 — MTF/MAE/MFE/CSV/backtest (17–18).
+Phase 1 bar engine (`test_bar.py`, 7 suites): strong/doji geometry + doji
+run-reset; inside/outside/ii; overlap/barbwire/tightening; gap parity with
+`CGapMM`; runs + pressure counters; freeze/no-look-ahead/tiny-history/zero-ATR.
 
 ## Reproduce
 

@@ -6,7 +6,7 @@
 //|          Include/FM/, then compile in MetaEditor (F7).             |
 //+------------------------------------------------------------------+
 #property copyright "FM-Indicator contributors"
-#property version   "1.20"
+#property version   "1.30"
 #property indicator_chart_window
 #property indicator_buffers 6
 #property indicator_plots   4
@@ -35,6 +35,7 @@
 #include <FM/MarketData.mqh>
 #include <FM/ATR.mqh>
 #include <FM/Swings.mqh>
+#include <FM/BarAnalyzer.mqh>
 #include <FM/MeasuredMove.mqh>
 #include <FM/FMEngine.mqh>
 #include <FM/Visualizer.mqh>
@@ -66,6 +67,11 @@ input double InpMinGapATRMult       = 1.0;
 input int    InpMinPushes           = 3;      // v1.2 exhaustion push threshold 2..5
 input bool   InpUseWedgeExhaustion  = true;
 input bool   InpShowScore           = true;   // v1.2 display-only S=0..100
+input double InpDojiMaxBodyRatio    = 0.15;   // Phase 1 bar engine: doji threshold
+input double InpBigBarATRMult       = 2.0;    // Phase 1: big-bar threshold
+input double InpSmallBarATRMult     = 0.5;    // Phase 1: small-bar threshold
+input double InpStrongClosePct      = 0.70;   // Phase 1: strong-close threshold
+input bool   InpEnableBarAnalysis   = true;   // Phase 1: bar-by-bar analyzer (read-only)
 input int    InpMTFTrendTFMinutes   = 0;      // v2 MTF overlay: 0=off, else higher-TF minutes
 input bool   InpExportCSV           = false;  // v2: write signals CSV on new CONFIRMED
 input string InpCSVFile             = "FM_signals.csv";
@@ -126,6 +132,9 @@ void ApplyInputsToConfig()
    g_cfg.MinGapATRMult=InpMinGapATRMult;
    g_cfg.MinPushes=InpMinPushes; g_cfg.UseWedgeExhaustion=InpUseWedgeExhaustion;
    g_cfg.ShowScore=InpShowScore;
+   g_cfg.DojiMaxBodyRatio=InpDojiMaxBodyRatio; g_cfg.BigBarATRMult=InpBigBarATRMult;
+   g_cfg.SmallBarATRMult=InpSmallBarATRMult; g_cfg.StrongClosePct=InpStrongClosePct;
+   g_cfg.EnableBarAnalysis=InpEnableBarAnalysis;
    g_cfg.ContextFilter=InpContextFilterMode;
    g_cfg.PriceMode=InpPriceMode;
    g_cfg.MaxActiveSetups=InpMaxActiveSetups; g_cfg.MaxBarsForward=InpMaxBarsForward;
@@ -262,6 +271,12 @@ int OnCalculate(const int rates_total,
 
       g_engine.FormProjections(sw, rates, rates_total, g_cfg, g_atr, time[1]);
       g_engine.Update(rates, rates_total, 1, g_cfg, g_atr);
+      // Phase 1 bar-by-bar analysis (read-only; never gates the state machine).
+      if(g_cfg.EnableBarAnalysis)
+        {
+         BarFeatures bf = CBarAnalyzer::Analyze(rates, rates_total, 1, g_atr.At(1), g_cfg);
+         g_log.Debug(CBarAnalyzer::Describe(bf, 1));
+        }
       // v2 MTF overlay (read-only annotation; never gates the state machine).
       if(InpMTFTrendTFMinutes > 0)
          g_log.Info(StringFormat("MTF bias=%d (HTF %d min, LOG_ONLY)", MTFBias(), InpMTFTrendTFMinutes));

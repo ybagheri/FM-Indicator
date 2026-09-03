@@ -35,6 +35,16 @@ public:
    int               MinPushes;
    bool              UseWedgeExhaustion;
    bool              ShowScore;      // append S=0..100 to labels (display only)
+   // Phase 1 bar-by-bar engine (docs/BAR_BY_BAR_ENGINE.md §1)
+   double            DojiMaxBodyRatio;
+   double            BigBarATRMult;
+   double            SmallBarATRMult;
+   double            StrongClosePct;
+   double            OverlapRatio;
+   int               BarbwireBars;
+   int               BarbwireMinOverlap;
+   int               PressureLookback;
+   bool              EnableBarAnalysis;  // master switch; false = engine idle
    ENUM_CTX_FILTER   ContextFilter;
    ENUM_FM_PRICE_MODE PriceMode;   // HIGHLOW = candles, CLOSE = line chart
    int               MaxActiveSetups;
@@ -71,6 +81,9 @@ public:
       EnableRangeMM=false; RangeLookback=50;
       EnableChannelMM=false; EnableGapMM=false; MinGapATRMult=1.0;
       MinPushes=3; UseWedgeExhaustion=true; ShowScore=true;
+      DojiMaxBodyRatio=0.15; BigBarATRMult=2.0; SmallBarATRMult=0.5;
+      StrongClosePct=0.70; OverlapRatio=0.50; BarbwireBars=5;
+      BarbwireMinOverlap=3; PressureLookback=10; EnableBarAnalysis=true;
       ContextFilter=CTX_LOG_ONLY; PriceMode=FM_PRICE_HIGHLOW;
       MaxActiveSetups=20; MaxBarsForward=100;
       UseIntrabarPotential=false; AtrPeriod=14;
@@ -125,7 +138,16 @@ public:
       if(MinGapATRMult<0.25) { MinGapATRMult=0.25; ok=false; }
       if(MinPushes<2) { MinPushes=2; ok=false; }
       if(MinPushes>5) { MinPushes=5; ok=false; }
-       return ok;
+      if(DojiMaxBodyRatio<0.05) { DojiMaxBodyRatio=0.05; ok=false; }
+      if(DojiMaxBodyRatio>0.40) { DojiMaxBodyRatio=0.40; ok=false; }
+      if(BigBarATRMult<=SmallBarATRMult) { BigBarATRMult=SmallBarATRMult+0.5; ok=false; }
+      if(StrongClosePct<0.5) { StrongClosePct=0.5; ok=false; }
+      if(StrongClosePct>1.0) { StrongClosePct=1.0; ok=false; }
+      if(BarbwireBars<3) { BarbwireBars=3; ok=false; }
+      if(BarbwireBars>10) { BarbwireBars=10; ok=false; }
+      if(PressureLookback<1) { PressureLookback=1; ok=false; }
+      if(PressureLookback>20) { PressureLookback=20; ok=false; }
+      return ok;
      }
   };
 

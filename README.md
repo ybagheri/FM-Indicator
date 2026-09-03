@@ -1,6 +1,6 @@
 # FM-Indicator — Fading Measured Moves (Al Brooks Price Action) for MT5
 
-Systematic, configurable, testable MQL5 indicator (v1.20) that projects
+Systematic, configurable, testable MQL5 indicator (v1.30) that projects
 **Leg1=Leg2 (AB=CD)** measured moves plus three v1.2 families — **range-height
 breakout**, **shallow-pullback channel**, **measuring gap** — plus optional
 **failed-breakout inverse-MM**, and detects **Fading Measured Move** setups as
@@ -37,6 +37,9 @@ tolerance `0.25×ATR`, overshoot `0.50×ATR`. Signal bar: close in extreme 50%,
 body ≥30%, adverse wick ≤60%, engulf/follow-through optional
 (follow-through = 1-bar delayed confirm). Exhaustion v1.2: `InpMinPushes=3` +
 wedge toggle. Score v1.2: display-only `S=0..100` in labels.
+Phase-1 bar engine (read-only): per-closed-bar features
+(doji/big/small/strong-close/inside/outside/ii/gap/overlap/runs/pressure/barbwire)
+logged at DEBUG, never gating signals — see `docs/BAR_BY_BAR_ENGINE.md`.
 **Price mode** `InpPriceMode`: `High/Low` (candles, default) or `Close`
 (line chart — swings/legs/targets/distances on closes, like mobile
 line-chart MM analysis). Families v1.2 (default OFF): `InpEnableRangeMM` /
@@ -92,7 +95,9 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 
 ## Docs
 
-`docs/RESEARCH.md` · `docs/SYSTEMATIC_SPECIFICATION.md` ·
+`docs/RESEARCH.md` · `docs/BROOKS_CONCEPTS.md` ·
+`docs/BAR_BY_BAR_ENGINE.md` · `docs/MARKET_CONTEXT.md` ·
+`docs/SYSTEMATIC_SPECIFICATION.md` ·
 `docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/FUTURE_ROADMAP.md`
 
 ## Self-critique (v1)
