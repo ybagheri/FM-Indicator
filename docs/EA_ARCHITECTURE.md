@@ -216,6 +216,15 @@ Chart/alerts    Execution/risk   CSV/backtest
   (losing baseline ranks below do-nothing — correct), census identical,
   0 errors.
 
-## 15. Later (PLANNED)
+## 15. Phase 36 — Parameter Robustness ✅ DONE (commit: this phase)
 
-Phases 36–42 robustness/OOS/forward/walk-forward/multi-symbol/regime/AUTO;
+- `docs/experiments/EXP-0001` (chase × minRR 3×3, SINGLE_DBL H1, consec-cap
+  understood mid-run and set 0 for measurement): minRR dead (all Rs ≥ 1.5),
+  chase monotonic (no plateau), best cell 9 trades +811.78 PF 2.22.
+  Verdict REJECT (noise-sized sample, IS-only). Confounder: consec-cap 3
+  flips cell economics (capped −37.44 vs uncapped +541.16) — needs OOS study.
+- 9 MT5 runs, 0 errors. Methodology (grid + plateau rule) proven.
+
+## 16. Later (PLANNED)
+
+Phases 37–42 OOS/forward/walk-forward/multi-symbol/regime/AUTO validation;
