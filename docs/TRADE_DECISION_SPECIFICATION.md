@@ -41,8 +41,15 @@ intent skip (PROVISIONAL_OFF / LATE_ENTRY / STALE). Every skip logs its
 machine-checkable reason. AUTO may always answer NO TRADE — it never means
 "trade everything".
 
-## 6. AUTO validation status (§27, intent level — no orders yet)
+## 6. AUTO validation status (§27) — VERDICT: NO MEASURED VALUE YET (Phase 42)
 
-T-011 (H1 window): AUTO vs SINGLE_* intent census compared (see
-MT5_TESTING_STATUS). Order-level PF/expectancy/drawdown comparison requires
-Phase 33 execution + Phase 34 baselines — NOT YET (honest).
+Intent level, H1 window (T-011): AUTO 93 sel/86 riskOK · SINGLE_PB 78/69
+(+69 no-candidate) · SINGLE_DBL 93/93.
+Order level, same window: AUTO 3 trades −353.49 PF 0.00 (T-014) ·
+SINGLE_PB 0 trades (T-015) · SINGLE_DBL 4 trades −37.44 PF 0.86 (T-016).
+XAUUSD: AUTO 10 trades +158.32 PF 1.33 (T-020). OOS: AUTO 5 trades
++487.82 PF 2.26 (T-019).
+Verdict: SINGLE_DBL beats AUTO on the EURUSD window; AUTO shows nothing
+beyond mix-dilution. Samples (3–10 trades/arm) cannot support a superiority
+claim either way. AUTO stays default for diversification logic, NOT for
+performance. Re-validate with ≥30 trades/arm after the first ACCEPTED edge.

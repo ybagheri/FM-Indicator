@@ -259,6 +259,14 @@ Chart/alerts    Execution/risk   CSV/backtest
 - Account note: terminal stays on real 15144344 (unfunded — live orders
   impossible; tester runs use simulated deposit and are unaffected).
 
-## 19. Later (PLANNED)
+## 19. Phase 42 — AUTO Validation ✅ DONE (commit: this phase)
 
-Phases 42–44 AUTO validation, paper readiness, live-readiness review.
+- Order-level numbers: AUTO PF 0.00 (T-014) vs SINGLE_DBL PF 0.86 (T-016)
+  vs SINGLE_PB no-trades (T-015); XAUUSD AUTO PF 1.33 (T-020); OOS AUTO
+  PF 2.26 (T-019). Verdict in `TRADE_DECISION_SPECIFICATION.md` §6:
+  no measured value yet (3–10 trades/arm); AUTO stays default for
+  diversification logic only; re-validate at ≥30 trades/arm.
+
+## 20. Later (PLANNED)
+
+Phases 43–44 paper readiness + live-readiness review.
