@@ -274,6 +274,16 @@ Chart/alerts    Execution/risk   CSV/backtest
   (expected, unproven); halt/adopt/CloseAll code-complete, not live-fired.
 - Execution needs GUI chart-attach + calendar time → NOT EXECUTED here.
 
-## 21. Later (PLANNED)
+## 21. Phase 44 — Live-Readiness Review ✅ DONE (verdict: NOT READY)
 
-Phase 44 live-readiness review (final gate).
+- New `docs/LIVE_READINESS.md`: 9-gate review — PASS on engine/tests/
+  baselines/docs; FAIL on accepted edge, OOS-of-edge, live forward,
+  sample size, funded account; PARTIAL on live safety drills.
+- Standing order: ANALYSIS_ONLY/PAPER until all gates flip with evidence.
+- Final regression: all 16 unit suites pass; tree clean; pushed.
+
+## EA track complete (Phases 20–44)
+
+Indicator untouched in behavior (parity proven T-003/T-004); EA built on the
+shared contract with 20 MT5 runs on record, 0 runtime errors, every result
+labeled BACKTEST/UNIT/NOT-TESTED, every gap declared.
