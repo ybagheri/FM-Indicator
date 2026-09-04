@@ -17,6 +17,7 @@
 #include <FM/RiskManager.mqh>
 #include <FM/ExecutionEngine.mqh>  // Phase 25: constructed+configured, no calls yet
 #include <FM/PositionManager.mqh>  // Phase 26: manage/BE/trail owned positions
+#include <FM/TradeIntent.mqh>      // Phase 27+: selection → trade intent
 #include <FM/Inputs.mqh>       // shared analysis inputs (verbatim)
 
 //--- EA inputs (Phase 23: selection + identity only; trading inputs later)
@@ -50,6 +51,10 @@ input int                InpTrailStepPts   = 50;
 input bool               InpUseBreakEven   = true;
 input int                InpBETriggerPts   = 300;
 input int                InpBEOffsetPts    = 20;
+//--- intent inputs (Phases 27–30; entries still need Phase 33 mode)
+input bool               InpTradeProvisional = false;
+input int                InpMaxHoldBars    = 5;
+input double             InpChaseATRMult   = 0.50;
 
 CFMConfig         g_cfg;
 CLogger           g_log;
@@ -58,6 +63,7 @@ CStrategyRegistry g_registry;
 CRiskManager      g_risk;
 CExecutionEngine  g_exec;
 CPositionManager  g_pos;
+CTradeIntentBuilder g_intent;
 datetime          g_last_bar = 0;
 long              g_bars = 0;
 long              g_selCount[STRAT_COUNT];
@@ -79,6 +85,7 @@ int OnInit()
    g_pos.Configure(InpMagic, InpSlippagePts, InpUseTrailing, InpTrailStartPts,
                    InpTrailStepPts, InpUseBreakEven, InpBETriggerPts,
                    InpBEOffsetPts);
+   g_intent.Configure(InpTradeProvisional, InpMaxHoldBars, InpChaseATRMult);
    // Restart recovery: adopt already-open magic positions (logged, generic).
    PositionFix adopted[];
    int nAdopt = g_pos.Refresh(_Symbol, adopted);
@@ -155,7 +162,21 @@ void OnTick()
       RiskDecision rd = g_risk.Check(_Symbol, sel.setup, spread, ymd);
       if(rd.allowed)
          g_riskOK++;
-      PrintFormat("[FM_EA] %s %s %s entry=%s stop=%s obj=%s score=%d%s R=%.2f cands=%d risk=%s vol=%.2f",
+      // Phase 27: FM intent (other strategies log pending until 28–30).
+      string intentTxt = "INTENT_PENDING_PHASE";
+      if(sel.strategy == STRAT_FM_FADE && rd.allowed)
+        {
+         double px = (sel.setup.dir > 0 ? SymbolInfoDouble(_Symbol, SYMBOL_ASK)
+                                        : SymbolInfoDouble(_Symbol, SYMBOL_BID));
+         TradeIntent ti;
+         string why = "";
+         if(g_intent.FromFM(sel.setup, res, px, why, ti))
+            intentTxt = StringFormat("WOULD_%s %s",
+                                     (ti.dir > 0 ? "BUY" : "SELL"), ti.note);
+         else
+            intentTxt = "SKIP_" + why;
+        }
+      PrintFormat("[FM_EA] %s %s %s entry=%s stop=%s obj=%s score=%d%s R=%.2f cands=%d risk=%s vol=%.2f %s",
                   TimeToString(res.barTime),
                   (sel.setup.dir > 0 ? "BUY" : "SELL"),
                   CStrategyRegistry::StrategyName(sel.strategy),
@@ -164,7 +185,7 @@ void OnTick()
                   DoubleToString(sel.setup.objective, _Digits),
                   sel.setup.score,
                   (sel.setup.provisional ? " PROV" : ""),
-                  sel.setup.rMult, n, rd.reason, rd.volume);
+                  sel.setup.rMult, n, rd.reason, rd.volume, intentTxt);
      }
    else if(g_bars % 500 == 0)
       PrintFormat("[FM_EA] %s NO_TRADE cands=%d (mode=%s)",

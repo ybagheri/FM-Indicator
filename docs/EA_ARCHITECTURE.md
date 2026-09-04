@@ -118,9 +118,27 @@ Chart/alerts    Execution/risk   CSV/backtest
   0 errors. Modify/close paths untested live (no positions exist while
   execution dormant) — honest gap, closed in Phase 34.
 
-## 8. Later (PLANNED)
+## 8. Phase 27 — FM Integration ✅ DONE (commit: this phase)
 
-Phases 27–30 strategy wiring; 31 AUTO + conflict resolution; 32 explanation;
+- New `MQL5/Include/FM/TradeIntent.mqh`: `TradeIntent` record +
+  `CTradeIntentBuilder` (permits table: BE always, trail only
+  PULLBACK/BREAKOUT, no partials v1; provisional gate; chase guard mirroring
+  Phase-8 late rule with 1e-9 epsilon — boundary flake caught by mirror and
+  fixed both sides). `FromFM` matches the winning setup to its FM plan by
+  dir+entry for `invalidClose` (else STOP-only invalidation).
+- Mirror: `tests/trade_intent.py` + `tests/test_intent.py` — pass.
+  Total UNIT TEST: 114.
+- EA: intent inputs (provisional OFF, hold 5, chase 0.5×ATR); FM intent logged
+  (`WOULD_BUY/SELL` / `SKIP_reason`) when risk-OK.
+- New `docs/STRATEGY_CATALOG.md` (FM section deep; rest per phase).
+- MT5 BACKTEST T-009 (H1 defaults): pass, census identical, FM selection
+  correctly held (LOW_RR), 0 errors. T-009b (minRR 0.5): `WOULD_BUY FM fade
+  BUY score=62 R=0.63 risk=OK vol=0.44` — FromFM proven live.
+
+## 9. Later (PLANNED)
+
+Phase 28 failed-BO; 29 pullback/breakout; 30 reversal/double;
+31 AUTO + conflict resolution; 32 explanation; 33 safety + modes; 31 AUTO + conflict resolution; 32 explanation;
 33 safety + modes; 34+ baselines/optimization/OOS/walk-forward per strategy.
 Each phase: implement → compile → unit tests → MT5 test → inspect →
 document → commit → push.

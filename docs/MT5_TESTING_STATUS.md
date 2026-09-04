@@ -115,6 +115,19 @@ Runtime errors:  0
 Trades:          0 → trading metrics N/A; modify/close paths not yet exercised
 ```
 
+## Run T-009 / T-009b — MT5 BACKTEST (EA + FM intent) ✅ PASS
+
+```text
+Git commit:      Phase-27 HEAD (TradeIntent + FromFM + EA intent logging)
+EA version:      FM_EA 1.00
+Symbol/TF/Dates/Model/Balance: same H1 window as T-005
+T-009 defaults:  pass, census identical; FM selection held at LOW_RR (correct)
+T-009b minRR 0.5: pass; live line WOULD_BUY FM fade BUY score=62 R=0.63
+                 risk=OK vol=0.44 (FromFM proven end-to-end)
+Runtime errors:  0
+Trades:          0 (no order code yet) → trading metrics N/A
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers
