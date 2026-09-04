@@ -223,6 +223,9 @@ public:
       return r;
      }
 
+   // Public normalizer (execution layer reuses the same symbol clamping).
+   static double     NormalizeVolume(string sym, double v) { return NormVol(sym, v); }
+
    // Introspection for logs/tests.
    int               TradesToday() const { return m_tradesToday; }
    double            DailyPL() const { return m_dailyPL; }

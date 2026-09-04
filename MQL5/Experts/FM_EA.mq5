@@ -15,6 +15,7 @@
 #include <FM/Analysis.mqh>
 #include <FM/StrategyRegistry.mqh>
 #include <FM/RiskManager.mqh>
+#include <FM/ExecutionEngine.mqh>  // Phase 25: constructed+configured, no calls yet
 #include <FM/Inputs.mqh>       // shared analysis inputs (verbatim)
 
 //--- EA inputs (Phase 23: selection + identity only; trading inputs later)
@@ -39,12 +40,15 @@ input int                InpMaxPerSymbol   = 1;     // 0=off
 input int                InpMaxConsecLoss  = 3;     // 0=off
 input int                InpMaxSpreadPts   = 50;    // points, 0=off
 input double             InpRiskMinRR      = 1.0;   // 0=off
+//--- execution inputs (Phase 25: configured only; orders need Phase 33 mode)
+input int                InpSlippagePts    = 10;
 
 CFMConfig         g_cfg;
 CLogger           g_log;
 CFMAnalysis       g_analysis;
 CStrategyRegistry g_registry;
 CRiskManager      g_risk;
+CExecutionEngine  g_exec;
 datetime          g_last_bar = 0;
 long              g_bars = 0;
 long              g_selCount[STRAT_COUNT];
@@ -62,6 +66,7 @@ int OnInit()
                     InpMaxDailyLoss, InpMaxTradesDay, InpMaxOpenPos,
                     InpMaxPerSymbol, InpMaxConsecLoss, InpMaxSpreadPts,
                     InpRiskMinRR, InpMagic);
+   g_exec.Configure(InpMagic, InpSlippagePts, InpMaxSpreadPts);
    ArrayInitialize(g_selCount, 0);
    PrintFormat("[FM_EA] init OK mode=%s magic=%d history=%d (ANALYSIS_ONLY, no orders)",
                CStrategyRegistry::ModeName(InpStratMode), InpMagic, InpHistoryBars);

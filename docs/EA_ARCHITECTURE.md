@@ -85,9 +85,25 @@ Chart/alerts    Execution/risk   CSV/backtest
 - MT5 BACKTEST T-006 (same H1 window): pass, selections identical to T-005,
   riskOK=481 / LOW_RR=47, 0 errors.
 
-## 6. Later (PLANNED)
+## 6. Phase 25 — Execution Engine ✅ DONE (commit: this phase, dormant)
 
-Phases 25–26 execution/position layers; 27–30 strategy wiring;
+- New `MQL5/Include/FM/ExecutionEngine.mqh`: `ExecResult{ok,reason,order/
+  dealTicket,price,volume}`, `CExecutionEngine::Configure/Buy/Sell/Send`
+  over `CTrade`. Pre-send gates (trade-mode direction, spread recheck,
+  volume bounds, quotes, stop-level distance, margin) + retcode
+  classification (`sent && DONE/DONE_PARTIAL` only). Build-6090 API fixes
+  found by compiling: `SetExpertMagicNumber` (not `SetMagicNumber`),
+  `PRICE_CHANGED` (not `PRICE_CHANGES`), no `NO_CONNECTION`/`PENDING`/
+  `NO_QUOTES` retcodes, no `SymbolInfoPoint(sym)` (use `SYMBOL_POINT`).
+- Mirror: `tests/execution.py` + `tests/test_execution.py` — pass.
+  Total UNIT TEST: 107.
+- EA constructs+configures it; makes NO calls yet (orders need Phase 33
+  mode). MT5 BACKTEST T-007: pass, census byte-identical to T-006,
+  0 errors. Live-order proof deferred to Phase 34 baselines (honest).
+
+## 7. Later (PLANNED)
+
+Phase 26 position layer; 27–30 strategy wiring;
 31 AUTO + conflict resolution; 32 explanation; 33 safety + modes;
 34+ baselines/optimization/OOS/walk-forward per strategy. Each phase:
 implement → compile → unit tests → MT5 test → inspect → document →

@@ -91,6 +91,18 @@ Runtime errors:  0
 Trades:          0 (no order code yet) → trading metrics N/A
 ```
 
+## Run T-007 — MT5 BACKTEST (EA + dormant execution layer) ✅ PASS
+
+```text
+Git commit:      Phase-25 HEAD (ExecutionEngine constructed, never called)
+EA version:      FM_EA 1.00
+Symbol/TF/Dates/Model/Balance: same as T-005/T-006
+Result:          Test passed (124811 ticks, 528 bars)
+Census:          byte-identical to T-006 (bars=528 riskOK=481, 1/293/14/0/220)
+Runtime errors:  0
+Trades:          0 (execution dormant) → trading metrics N/A
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers
