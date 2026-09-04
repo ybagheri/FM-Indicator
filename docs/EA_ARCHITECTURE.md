@@ -192,6 +192,20 @@ Chart/alerts    Execution/risk   CSV/backtest
   (`EXEC_` ×0), tester `acctTradeMode=0` (DEMO class → DEMO baselines
   permitted in Phase 34), 0 errors.
 
-## 13. Later (PLANNED)
+## 13. Phase 34 — MT5 Baseline Testing ✅ DONE (commit: this phase)
 
-Phase 34+ baselines/optimization/OOS/walk-forward per strategy.
+- First REAL order flow: EXEC_DONE ×3 (+EXEC_INVALID_STOPS ×3 on
+  SELL-doubles — stop-level at send time, under review), closed-deal scan
+  fed risk accounting (`closed profit=` lines), BE path armed.
+- `reports/` created: T-014/15/16 `.htm` + `README.md` summaries.
+  Baselines (H1 window, defaults, DEMO): AUTO 3 trades 0/3 −353.49 PF 0.00;
+  SINGLE_PB 0 trades (51 late + 18 prov-off, mechanism verified);
+  SINGLE_DBL 4 trades 1/3 −37.44 PF 0.86. Weak choppy-window baselines are
+  EXPECTED — they are the bar optimization must beat (IS+OOS).
+- New `docs/BACKTESTING_GUIDE.md` (ini, record template, §17 fields) +
+  `Presets/FM_EA_Auto_Baseline.set` v1 (123/123 params resolve-checked,
+  ANALYSIS_ONLY default; DEMO override lives in tester ini only).
+
+## 14. Later (PLANNED)
+
+Phases 35–42 optimization/robustness/OOS/forward/walk-forward/regime/AUTO;

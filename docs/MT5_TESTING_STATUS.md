@@ -188,6 +188,21 @@ Note:            virtual P/L is OHLC-settled simulation, NOT a backtest
                  profit claim; order-level baselines start in Phase 34.
 ```
 
+## Runs T-014/15/16 — MT5 BACKTEST (DEMO baselines, REAL orders) ✅ PASS
+
+```text
+Common: FM_EA 1.00, EURUSD H1 2025.11.03–12.03, Model 1, $10k 1:100,
+        broker-current spread, no commission, defaults + InpTradeMode=2
+T-014 AUTO:        3 trades, 0/3, net -353.49, PF 0.00, exp -117.83,
+                   balDD 353.49 (3.53%), eqDD 373.84; EXEC_DONE x3,
+                   EXEC_INVALID_STOPS x3 (SELL-doubles, under review)
+T-015 SINGLE_PB:   0 trades (51 LATE + 18 PROV_OFF — verified, not silent)
+T-016 SINGLE_DBL:  4 trades, 1/3, net -37.44, PF 0.86, exp -9.36,
+                   balDD 268.69 (2.63%), eqDD 316.93
+Runtime errors:    0 (all runs)
+Reports:           reports/T-01{4,5,6}_*.htm + reports/README.md
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers
