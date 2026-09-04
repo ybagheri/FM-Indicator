@@ -45,6 +45,7 @@
 #include <FM/DecisionEngine.mqh>
 #include <FM/MeasuredMove.mqh>
 #include <FM/FMEngine.mqh>
+#include <FM/Analysis.mqh>
 #include <FM/Visualizer.mqh>
 #include <FM/Alerts.mqh>
 
@@ -143,9 +144,7 @@ double BufCalcSwing[];
 CFMConfig      g_cfg;
 CLogger        g_log;
 CMarketData    g_md;
-CATR           g_atr;
-CSwingDetector g_swings;
-CFMEngine      g_engine;
+CFMAnalysis    g_analysis;   // Phase 21: shared contract (owns ATR/swings/engine)
 CVisualizer    g_viz;
 CAlertManager  g_alerts;
 datetime       g_last_closed_time = 0;
@@ -215,9 +214,7 @@ int OnInit()
   {
    ApplyInputsToConfig();
    g_log.SetLevel(g_cfg.LogLevel);
-   g_atr.SetPeriod(g_cfg.AtrPeriod);
-   g_swings.SetK(g_cfg.SwingK);
-   g_engine.SetLogger(GetPointer(g_log));
+   g_analysis.Setup(g_cfg, GetPointer(g_log));
 
    SetIndexBuffer(0, BufTarget, INDICATOR_DATA);
    SetIndexBuffer(1, BufPotential, INDICATOR_DATA);
@@ -264,7 +261,7 @@ int TFBias(int tfMinutes)
    s20 /= 20.0; s50 /= 50.0;
    double rng = c[0];
    if(rng == 0) return 0;
-   double gap = (s20 - s50) / MathMax(1e-9, g_atr.At(1));
+   double gap = (s20 - s50) / MathMax(1e-9, g_analysis.AtrAt(1));
    if(gap > 0.8) return +1;
    if(gap < -0.8) return -1;
    return 0;
@@ -316,265 +313,31 @@ int OnCalculate(const int rates_total,
      }
 
    bool isNewClosedBar = (time[1] != g_last_closed_time);
-   if(prev_calculated==0) { g_engine.Reset(); g_swings.Reset(); g_first_run=true; }
+   if(prev_calculated==0) { g_analysis.Reset(); g_first_run=true; }
 
    if(prev_calculated==0 || isNewClosedBar)
      {
       g_last_closed_time = time[1];
-      // ATR over full copy
-      g_atr.Update(rates, rates_total);
-      // Swings from confirmed bars only (newest closed shift = 1)
-      g_swings.Update(rates, rates_total, 1, g_cfg.PriceMode);
-
-      // Snapshot previous states for edge-triggered buffers/alerts
-      int nPrev = g_engine.ActiveCount();
+      // Snapshot previous FM states BEFORE analysis mutates the engine
+      // (edge-triggered buffers/alerts below).
+      CFMEngine *eng = g_analysis.EnginePtr();
+      int nPrev = eng.ActiveCount();
       long prevIds[]; ENUM_FM_STATE prevStates[];
       ArrayResize(prevIds, nPrev); ArrayResize(prevStates, nPrev);
-      for(int i=0;i<nPrev;i++) { CFMSetup s; g_engine.GetSetup(i,s); prevIds[i]=s.id; prevStates[i]=s.state; }
+      for(int i=0;i<nPrev;i++) { CFMSetup s; eng.GetSetup(i,s); prevIds[i]=s.id; prevStates[i]=s.state; }
 
-      // Copy swings to plain array
-      SwingPoint sw[]; ArrayResize(sw, g_swings.Count());
-      for(int i=0;i<g_swings.Count();i++) g_swings.Get(i, sw[i]);
-
-      g_engine.FormProjections(sw, rates, rates_total, g_cfg, g_atr, time[1]);
-      g_engine.Update(rates, rates_total, 1, g_cfg, g_atr);
-       // Phase 1 bar-by-bar analysis (read-only; never gates the state machine).
-       if(g_cfg.EnableBarAnalysis)
+      // Shared analysis contract (Phase 21): single-source pipeline
+      // (ATR → swings → projections → FM engine → Phases 1–8).
+      FMAnalysisResult res;
+      g_analysis.Update(rates, rates_total, g_cfg, 1, res);
+      double atrNow = g_analysis.AtrAt(1);
+      // Phases 1–5 run inside CFMAnalysis::Update (see Analysis.mqh).
+       // Phase 6 runs inside CFMAnalysis::Update (see Analysis.mqh).
+       // Phases 7–8 run inside CFMAnalysis::Update (see Analysis.mqh).
+       // Adapter below: FM_DECISION label + LTF confirm (read-only).
+       Decision dec = res.decision;
+       if(g_cfg.EnableDecision && res.decisionDone)
          {
-          BarFeatures bf = CBarAnalyzer::Analyze(rates, rates_total, 1, g_atr.At(1), g_cfg);
-          g_log.Debug(CBarAnalyzer::Describe(bf, 1));
-         }
-       // Phase 2 pullback patterns (read-only; never gates the state machine).
-       if(g_cfg.EnablePullbackPatterns)
-         {
-          int td = CPullbackPatterns::TrendDir(rates, rates_total, 1, g_atr.At(1), g_cfg);
-          string pbMsg = StringFormat("PB trend=%d", td);
-          if(td > 0)
-            {
-             PullbackSignal pb = CPullbackPatterns::DetectBull(rates, rates_total, 1, g_atr.At(1), g_cfg);
-             if(pb.found) pbMsg += " " + CPullbackPatterns::DescribePB(pb, true);
-            }
-          else if(td < 0)
-            {
-             PullbackSignal pb = CPullbackPatterns::DetectBear(rates, rates_total, 1, g_atr.At(1), g_cfg);
-             if(pb.found) pbMsg += " " + CPullbackPatterns::DescribePB(pb, false);
-            }
-          DoubleSignal dTop = CPullbackPatterns::FindDoubleTop(sw, g_atr.At(1), g_cfg);
-          DoubleSignal dBot = CPullbackPatterns::FindDoubleBottom(sw, g_atr.At(1), g_cfg);
-          if(dTop.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(dTop);
-          if(dBot.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(dBot);
-          DoubleSignal mTop = CPullbackPatterns::MicroDoubleTop(rates, rates_total, 1, g_atr.At(1), g_cfg);
-          DoubleSignal mBot = CPullbackPatterns::MicroDoubleBottom(rates, rates_total, 1, g_atr.At(1), g_cfg);
-          if(mTop.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(mTop);
-          if(mBot.found) pbMsg += " " + CPullbackPatterns::DescribeDouble(mBot);
-          g_log.Debug(pbMsg);
-         }
-       // Phase 3 market-state engine (read-only; never gates the state machine).
-       if(g_cfg.EnableMarketState)
-         {
-          MarketState ms = CMarketState::Analyze(rates, rates_total, 1, g_atr.At(1), g_cfg);
-          g_log.Debug(CMarketState::Describe(ms, 1));
-         }
-       // Phase 4 breakout engine (read-only; never gates the state machine).
-       if(g_cfg.EnableBreakout)
-         {
-          BreakoutSignal bo = CBreakoutEngine::Analyze(rates, rates_total, 1, g_atr.At(1), sw, g_cfg);
-          if(bo.found) g_log.Debug(CBreakoutEngine::Describe(bo));
-         }
-       // Phase 5 reversal engine (read-only; never gates the state machine).
-       if(g_cfg.EnableReversal)
-         {
-          ReversalSignal rvB = CMajorReversal::Analyze(rates, rates_total, 1, g_atr.At(1), sw, g_cfg, +1);
-          ReversalSignal rvS = CMajorReversal::Analyze(rates, rates_total, 1, g_atr.At(1), sw, g_cfg, -1);
-          if(rvB.found) g_log.Debug(CMajorReversal::Describe(rvB));
-          if(rvS.found) g_log.Debug(CMajorReversal::Describe(rvS));
-          ExhaustionReport exB = CExhaustionAnalyzer::Report(rates, rates_total, 1, +1, g_atr.At(1), g_cfg);
-          ExhaustionReport exS = CExhaustionAnalyzer::Report(rates, rates_total, 1, -1, g_atr.At(1), g_cfg);
-          if(exB.breadth > 0) g_log.Debug(CExhaustionAnalyzer::Describe(exB, +1));
-          if(exS.breadth > 0) g_log.Debug(CExhaustionAnalyzer::Describe(exS, -1));
-          LegCount lgB = CLegCounter::CountBull(sw);
-          LegCount lgS = CLegCounter::CountBear(sw);
-          if(lgB.valid && lgB.legs > 0) g_log.Debug(CLegCounter::Describe(lgB, +1));
-          if(lgS.valid && lgS.legs > 0) g_log.Debug(CLegCounter::Describe(lgS, -1));
-         }
-       // Phase 6 FM setup plans (read-only; never gates the state machine).
-       if(g_cfg.EnableSetup)
-         {
-          for(int i=0;i<g_engine.ActiveCount();i++)
-            {
-             CFMSetup s; if(!g_engine.GetSetup(i,s)) continue;
-             if(s.state!=FM_DEVELOPING && s.state!=FM_CONFIRMED) continue;
-             int sh=-1;
-             for(int k=1;k<rates_total;k++)
-               if(rates[k].time==s.signal_time) { sh=k; break; }
-             if(sh<1) continue;
-             SetupPlan pl=CSetupPlanner::Plan(rates[sh],s.dir,s.target,s.b0.price,
-                g_atr.At(1),g_cfg,s.id,s.family,s.state==FM_CONFIRMED,sh);
-              if(pl.valid) g_log.Debug(CSetupPlanner::Describe(pl));
-             }
-          }
-       // Phase 7 general setup catalog (read-only; never gates the state machine).
-       GeneralSetup genBest; CGeneralSetups::InitNone(genBest);
-       bool haveGen=false;
-       double atrNow7=g_atr.At(1);
-       if(g_cfg.EnableGeneralSetups && atrNow7>0)
-         {
-          GeneralSetup cand[];
-          ArrayResize(cand,0);
-          int wEnd7=1+g_cfg.MaxPullbackBars;
-          if(wEnd7>=rates_total) wEnd7=rates_total-1;
-          int td7=CPullbackPatterns::TrendDir(rates,rates_total,1,atrNow7,g_cfg);
-          if(td7>0)
-            {
-             PullbackSignal pbB=CPullbackPatterns::DetectBull(rates,rates_total,1,atrNow7,g_cfg);
-             if(pbB.found && pbB.signalBar>=1 && pbB.signalBar<rates_total)
-               {
-                double winH=rates[1].high;
-                for(int w=2;w<=wEnd7;w++) if(rates[w].high>winH) winH=rates[w].high;
-                GeneralSetup g=CGeneralSetups::FromPullbackBull(pbB,rates[pbB.signalBar].high,pbB.stop,winH,atrNow7,g_cfg);
-                if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
-               }
-            }
-          else if(td7<0)
-            {
-             PullbackSignal pbS=CPullbackPatterns::DetectBear(rates,rates_total,1,atrNow7,g_cfg);
-             if(pbS.found && pbS.signalBar>=1 && pbS.signalBar<rates_total)
-               {
-                double winL=rates[1].low;
-                for(int w=2;w<=wEnd7;w++) if(rates[w].low<winL) winL=rates[w].low;
-                GeneralSetup g=CGeneralSetups::FromPullbackBear(pbS,rates[pbS.signalBar].low,pbS.stop,winL,atrNow7,g_cfg);
-                if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
-               }
-            }
-          DoubleSignal darr[4];
-          darr[0]=CPullbackPatterns::FindDoubleTop(sw,atrNow7,g_cfg);
-          darr[1]=CPullbackPatterns::FindDoubleBottom(sw,atrNow7,g_cfg);
-          darr[2]=CPullbackPatterns::MicroDoubleTop(rates,rates_total,1,atrNow7,g_cfg);
-          darr[3]=CPullbackPatterns::MicroDoubleBottom(rates,rates_total,1,atrNow7,g_cfg);
-          for(int di=0;di<4;di++)
-            {
-             if(!darr[di].found) continue;
-             int b1=darr[di].bar1, b2=darr[di].bar2;
-             if(b1<1||b2<1||b1>=rates_total||b2>=rates_total) continue;
-             int lo=(b2<b1?b2:b1), hi=(b2<b1?b1:b2);
-             double trough=0; bool tInit=false;
-             for(int k=lo;k<=hi;k++)
-               {
-                double v=(darr[di].dir<0?rates[k].low:rates[k].high);
-                if(!tInit) { trough=v; tInit=true; }
-                else if(darr[di].dir<0) { if(v<trough) trough=v; }
-                else { if(v>trough) trough=v; }
-               }
-             if(!tInit) continue;
-             GeneralSetup g=CGeneralSetups::FromDouble(darr[di],trough,atrNow7,g_cfg);
-             if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
-            }
-          BreakoutSignal bo7=CBreakoutEngine::Analyze(rates,rates_total,1,atrNow7,sw,g_cfg);
-          if(bo7.found)
-            {
-             GeneralSetup g=CGeneralSetups::FromBreakout(bo7,close[1],atrNow7,g_cfg);
-             if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
-            }
-          int revK=g_cfg.RevLookback;
-          if(revK<5) revK=5;
-          if(revK>50) revK=50;
-          double emaTail[];
-          CMajorReversal::EMA20Tail(rates,rates_total,1,revK,emaTail);
-          if(ArraySize(emaTail)>0)
-            {
-             ReversalSignal rvB=CMajorReversal::Analyze(rates,rates_total,1,atrNow7,sw,g_cfg,+1);
-             ReversalSignal rvS=CMajorReversal::Analyze(rates,rates_total,1,atrNow7,sw,g_cfg,-1);
-             if(rvB.found)
-               {
-                GeneralSetup g=CGeneralSetups::FromReversal(rvB,close[1],emaTail[0],atrNow7,g_cfg);
-                if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
-               }
-             if(rvS.found)
-               {
-                GeneralSetup g=CGeneralSetups::FromReversal(rvS,close[1],emaTail[0],atrNow7,g_cfg);
-                if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
-               }
-            }
-          int best7=CGeneralSetups::SelectBest(cand);
-          if(best7>=0) { genBest=cand[best7]; haveGen=true; }
-          // FM contest: best DEVELOPING/CONFIRMED plan joins with its ScoreSignal
-          // and displaces the general best only on a strictly greater score.
-          int fmScoreBest=-1;
-          SetupPlan fmPlanBest; fmPlanBest.valid=false;
-          for(int i=0;i<g_engine.ActiveCount();i++)
-            {
-             CFMSetup s; if(!g_engine.GetSetup(i,s)) continue;
-             if(s.state!=FM_DEVELOPING && s.state!=FM_CONFIRMED) continue;
-             int sh=-1;
-             for(int k=1;k<rates_total;k++)
-               if(rates[k].time==s.signal_time) { sh=k; break; }
-             if(sh<1) continue;
-             SetupPlan pl=CSetupPlanner::Plan(rates[sh],s.dir,s.target,s.b0.price,
-                atrNow7,g_cfg,s.id,s.family,s.state==FM_CONFIRMED,sh);
-             if(!pl.valid) continue;
-             int fdir=-s.dir;
-             double dtAtr=(s.dir>0?(s.target-high[1]):(low[1]-s.target))/atrNow7;
-             int q=CConfirmation::ScoreSignal(rates,rates_total,1,fdir,g_cfg,s.dir,atrNow7,dtAtr,s.confidence);
-             if(q>fmScoreBest) { fmScoreBest=q; fmPlanBest=pl; }
-            }
-          if(fmPlanBest.valid && (!haveGen || fmScoreBest>genBest.score))
-            {
-             GeneralSetup f; CGeneralSetups::InitNone(f);
-             f.valid=true; f.type=SETUP_FM_FADE; f.dir=fmPlanBest.fadeDir;
-             f.entry=fmPlanBest.entry; f.stop=fmPlanBest.stop;
-             f.objective=fmPlanBest.objective;
-             f.riskPts=fmPlanBest.riskPts; f.rewardPts=fmPlanBest.rewardPts;
-             f.rMult=fmPlanBest.rMult; f.rrOK=fmPlanBest.rrOK;
-             f.provisional=fmPlanBest.provisional;
-             f.signalBar=fmPlanBest.signalShift; f.refPrice=fmPlanBest.entry;
-             f.score=fmScoreBest;
-             genBest=f; haveGen=true;
-             g_log.Debug(CGeneralSetups::Describe(f));
-            }
-         }
-       // Phase 8 decision engine (read-only; never gates the state machine).
-       if(g_cfg.EnableDecision)
-         {
-          DecisionContext dctx;
-          MarketState ms8=CMarketState::Analyze(rates,rates_total,1,atrNow7,g_cfg);
-          dctx.state=ms8.state;
-          dctx.pct[0]=ms8.pctBullTrend; dctx.pct[1]=ms8.pctBearTrend;
-          dctx.pct[2]=ms8.pctBullChannel; dctx.pct[3]=ms8.pctBearChannel;
-          dctx.pct[4]=ms8.pctRange; dctx.pct[5]=ms8.pctBreakout;
-          dctx.pctValid=ms8.valid;
-          BarFeatures bf8=CBarAnalyzer::Analyze(rates,rates_total,1,atrNow7,g_cfg);
-          dctx.barbwire=(bf8.valid && bf8.barbwire);
-          dctx.close=close[1];
-          dctx.midRange=false;
-          if(ms8.state==MS_TRADING_RANGE)
-            {
-             int L8=g_cfg.StateLookback;
-             if(L8<10) L8=10;
-             if(L8>=rates_total) L8=rates_total-1;
-             double hh=rates[1].high, ll=rates[1].low;
-             for(int w=2;w<=L8;w++)
-               {
-                if(rates[w].high>hh) hh=rates[w].high;
-                if(rates[w].low<ll) ll=rates[w].low;
-               }
-             if(hh>ll)
-               {
-                double pos=(close[1]-ll)/(hh-ll);
-                dctx.midRange=(pos>=1.0/3.0 && pos<=2.0/3.0);
-               }
-            }
-          dctx.failCount=0; dctx.hasFollow=false;
-          int scanN=20;
-          if(scanN>=rates_total) scanN=rates_total-1;
-          for(int j=1;j<=scanN;j++)
-            {
-             BreakoutSignal bj=CBreakoutEngine::Analyze(rates,rates_total,j,atrNow7,sw,g_cfg);
-             if(!bj.found) continue;
-             if(bj.outcome==BO_FAILED) dctx.failCount++;
-             if(bj.outcome==BO_FOLLOW_THROUGH) dctx.hasFollow=true;
-            }
-          Decision dec=CDecisionEngine::Decide(genBest,dctx,atrNow7,g_cfg);
-          g_log.Debug(CDecisionEngine::Describe(dec));
           color dc=(dec.action==DEC_BUY?clrLime:(dec.action==DEC_SELL?clrRed:(dec.action==DEC_WAIT?clrOrange:clrGray)));
           string dtxt=StringFormat("%s %s",CDecisionEngine::ActionName(dec.action),CDecisionEngine::ReasonName(dec.reason));
           if(ObjectFind(0,"FM_DECISION")<0) ObjectCreate(0,"FM_DECISION",OBJ_TEXT,0,time[1],close[1]);
@@ -601,10 +364,10 @@ int OnCalculate(const int rates_total,
       // shifts here → freeze guarantee (history built bar-by-bar identically).
       BufTarget[1] = EMPTY_VALUE; BufPotential[1]=EMPTY_VALUE;
       BufDeveloping[1]=EMPTY_VALUE; BufConfirmed[1]=EMPTY_VALUE;
-      BufCalcATR[1]=g_atr.At(1);
-      for(int i=0;i<g_engine.ActiveCount();i++)
+      BufCalcATR[1]=atrNow;
+      for(int i=0;i<eng.ActiveCount();i++)
         {
-         CFMSetup s; g_engine.GetSetup(i,s);
+         CFMSetup s; eng.GetSetup(i,s);
          // find prev state
          ENUM_FM_STATE ps = FM_PROJECTED;
          for(int k=0;k<nPrev;k++) if(prevIds[k]==s.id) { ps=prevStates[k]; break; }
@@ -626,21 +389,21 @@ int OnCalculate(const int rates_total,
                if(InpExportCSV)
                  {
                   int fdir = -s.dir;
-                  double dt = (g_atr.At(1) > 0) ? ((s.dir > 0 ? s.target - high[1] : low[1] - s.target) / g_atr.At(1)) : 0;
-                  int q = CConfirmation::ScoreSignal(rates, rates_total, 1, fdir, g_cfg, s.dir, g_atr.At(1), dt, s.confidence);
+                  double dt = (atrNow > 0) ? ((s.dir > 0 ? s.target - high[1] : low[1] - s.target) / atrNow) : 0;
+                  int q = CConfirmation::ScoreSignal(rates, rates_total, 1, fdir, g_cfg, s.dir, atrNow, dt, s.confidence);
                   ExportSignalRow(time[1], s, px, q);
                  }
               }
             if(s.state==FM_CONFIRMED || s.state==FM_DEVELOPING || s.state==FM_POTENTIAL)
               {
-               if(g_engine.ClaimAlert(s.id, s.state))
+               if(eng.ClaimAlert(s.id, s.state))
                   g_alerts.Dispatch(g_cfg, s.id, s.state, s.dir, _Symbol, (ENUM_TIMEFRAMES)_Period, px, s.target);
               }
            }
          if(s.state==FM_PROJECTED || s.state==FM_POTENTIAL || s.state==FM_DEVELOPING)
             if(BufTarget[1]==EMPTY_VALUE) BufTarget[1]=s.target;
         }
-      g_viz.Sync(rates, rates_total, g_engine, g_cfg, g_atr.At(1));
+      g_viz.Sync(rates, rates_total, *eng, g_cfg, atrNow);
       g_first_run=false;
       return(rates_total);
      }
