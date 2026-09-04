@@ -203,6 +203,15 @@ Runtime errors:    0 (all runs)
 Reports:           reports/T-01{4,5,6}_*.htm + reports/README.md
 ```
 
+## Run T-017 — MT5 BACKTEST (OnTester criterion check) ✅ PASS
+
+```text
+Git commit:      Phase-35 HEAD (OnTester composite)
+EA version:      FM_EA 1.00, AUTO DEMO defaults (same as T-014)
+Result:          Test passed; OnTester result -0.15118625; census identical
+Runtime errors:  0
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers

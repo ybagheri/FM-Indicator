@@ -136,6 +136,64 @@ void OnDeinit(const int reason)
    PrintFormat("[FM_EA] %s", g_paper.Summary());
   }
 
+// Phase 35 — custom optimization criterion (§20). Composite over the
+// COMPLETED test (tester statistics), NOT net profit alone:
+//   score = PF_norm*0.35 + expectancyR*0.25 + activity*0.15 + ddPenalty
+// where PF_norm = min(PF,3)/3, expectancyR = avg deal / mean risk (per
+// Tester history), activity = min(trades,50)/50, ddPenalty =
+// -(balanceDD% / 20) capped at -1. No-trade runs score ≤ 0 (never optimal).
+// Formula documented in OPTIMIZATION_GUIDE.md §2.
+double OnTester()
+  {
+   int deals = (int)TesterStatistics(STAT_DEALS);
+   if(deals <= 0)
+      return 0.0;
+   double pf = TesterStatistics(STAT_PROFIT_FACTOR);
+   double expProfit = TesterStatistics(STAT_EXPECTED_PAYOFF);
+   double initDep = TesterStatistics(STAT_INITIAL_DEPOSIT);
+   double balDDpct = 0.0;
+   if(initDep > 0)
+      balDDpct = TesterStatistics(STAT_BALANCEDD_PERCENT);
+   double avgRisk = 0.0;
+   HistorySelect(0, TimeCurrent() + 86400);
+   double riskSum = 0.0;
+   int riskN = 0;
+   for(int i = 0; i < HistoryDealsTotal(); i++)
+     {
+      ulong dt = HistoryDealGetTicket(i);
+      if(dt == 0)
+         continue;
+      if(HistoryDealGetInteger(dt, DEAL_MAGIC) != InpMagic)
+         continue;
+      if(HistoryDealGetInteger(dt, DEAL_ENTRY) != DEAL_ENTRY_IN)
+         continue;
+      double sl = HistoryDealGetDouble(dt, DEAL_SL);
+      double open = HistoryDealGetDouble(dt, DEAL_PRICE);
+      double vol = HistoryDealGetDouble(dt, DEAL_VOLUME);
+      string sym = HistoryDealGetString(dt, DEAL_SYMBOL);
+      if(sl <= 0 || vol <= 0)
+         continue;
+      double loss = 0.0;
+      ENUM_ORDER_TYPE t = (sl < open ? ORDER_TYPE_BUY : ORDER_TYPE_SELL);
+      if(OrderCalcProfit(t, sym, vol, open, sl, loss))
+        {
+         riskSum += -loss;
+         riskN++;
+        }
+     }
+   if(riskN > 0)
+      avgRisk = riskSum / riskN;
+   double pfN = MathMin(pf, 3.0) / 3.0;
+   double expR = (avgRisk > 0 ? expProfit / avgRisk : 0.0);
+   expR = MathMax(-2.0, MathMin(2.0, expR)) / 2.0;   // → [-1,1]
+   double act = MathMin((double)deals, 50.0) / 50.0;
+   double ddPen = -MathMin(balDDpct / 20.0, 1.0);
+   double score = 0.35 * pfN + 0.25 * expR + 0.15 * act + 0.25 * ddPen;
+   PrintFormat("[FM_EA] OnTester deals=%d PF=%.2f exp=%.2f expR=%.2f dd=%.2f%% score=%.4f",
+               deals, pf, expProfit, expR * 2.0, balDDpct, score);
+   return score;
+  }
+
 void OnTick()
   {
    datetime bt0 = iTime(_Symbol, _Period, 0);

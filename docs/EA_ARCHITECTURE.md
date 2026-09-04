@@ -206,6 +206,16 @@ Chart/alerts    Execution/risk   CSV/backtest
   `Presets/FM_EA_Auto_Baseline.set` v1 (123/123 params resolve-checked,
   ANALYSIS_ONLY default; DEMO override lives in tester ini only).
 
-## 14. Later (PLANNED)
+## 14. Phase 35 — Optimization Objective ✅ DONE (commit: this phase)
 
-Phases 35–42 optimization/robustness/OOS/forward/walk-forward/regime/AUTO;
+- `FM_EA::OnTester` custom criterion (PF/expectancy-R/activity/DD composite;
+  no-trade = 0). New `docs/OPTIMIZATION_GUIDE.md` (tunable list, formula,
+  genetic-then-grid procedure, plateau rule) + `docs/experiments/
+  EXP-0000-template.md` (registry rules: OOS never tunes, spikes rejected).
+- MT5 BACKTEST T-017 (AUTO DEMO rerun): `OnTester result -0.15118625`
+  (losing baseline ranks below do-nothing — correct), census identical,
+  0 errors.
+
+## 15. Later (PLANNED)
+
+Phases 36–42 robustness/OOS/forward/walk-forward/multi-symbol/regime/AUTO;
