@@ -173,6 +173,21 @@ Runtime errors:  0
 Trades:          0 → trading metrics N/A
 ```
 
+## Run T-013 — MT5 BACKTEST (EA, PAPER mode) ✅ PASS
+
+```text
+Git commit:      Phase-33 HEAD (SafetyManager + PaperTrader + mode wiring)
+EA version:      FM_EA 1.00, InpTradeMode=PAPER (override), rest defaults
+Symbol/TF/Dates/Model/Balance: same H1 window
+Result:          Test passed (124811 ticks, 528 bars)
+Init:            mode=PAPER acctTradeMode=0 (tester = DEMO class)
+Virtual:         10 opens / 10 closes, W/L 6/4, P +3605.51, avgR 3.61
+Real orders:     0 (EXEC_ x0 — PAPER path never calls execution)
+Runtime errors:  0
+Note:            virtual P/L is OHLC-settled simulation, NOT a backtest
+                 profit claim; order-level baselines start in Phase 34.
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers

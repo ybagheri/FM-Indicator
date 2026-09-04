@@ -178,6 +178,20 @@ Chart/alerts    Execution/risk   CSV/backtest
 - MT5 BACKTEST T-012: pass, census identical to T-011 (86/435), 10 EXPLAIN
   blocks with alternates verified in log, 0 errors.
 
-## 12. Later (PLANNED)
+## 12. Phase 33 — Safety + Modes ✅ DONE (commit: this phase)
 
-Phase 33 safety + modes; 34+ baselines/optimization/OOS/walk-forward.
+- `SafetyManager.mqh`: ANALYSIS_ONLY/PAPER/DEMO/LIVE (default safest);
+  DEMO refuses real accounts, LIVE needs real account + `TRADE_LIVE` token;
+  latching halts (emergency/drawdown/daily-loss), session pause, close-on-halt.
+- `PaperTrader.mqh`: virtual fills, per-bar OHLC settle (SL-first),
+  R accounting, summary. New `RISK_MANAGEMENT.md`, `EA_USER_GUIDE.md`.
+- Mirror: `tests/safety.py` + `tests/test_safety.py` — pass.
+  Total UNIT TEST: ~130.
+- MT5 BACKTEST T-013 (PAPER, H1): pass; 10 PAPER_OPEN/10 PAPER_CLOSE
+  (6/4, +3605.51, avgR 3.61 — objectives, not a profit claim), 0 real orders
+  (`EXEC_` ×0), tester `acctTradeMode=0` (DEMO class → DEMO baselines
+  permitted in Phase 34), 0 errors.
+
+## 13. Later (PLANNED)
+
+Phase 34+ baselines/optimization/OOS/walk-forward per strategy.

@@ -19,6 +19,8 @@
 #include <FM/PositionManager.mqh>  // Phase 26: manage/BE/trail owned positions
 #include <FM/TradeIntent.mqh>      // Phase 27+: selection → trade intent
 #include <FM/TradeExplanation.mqh> // Phase 32: explainable decisions
+#include <FM/SafetyManager.mqh>    // Phase 33: modes + kill-switches
+#include <FM/PaperTrader.mqh>      // Phase 33: virtual fills
 #include <FM/Inputs.mqh>       // shared analysis inputs (verbatim)
 
 //--- EA inputs (Phase 23: selection + identity only; trading inputs later)
@@ -62,6 +64,14 @@ input int                InpAutoTrendBonus = 10;
 input int                InpAutoProvPenalty = 5;
 input int                InpAutoRRBonus    = 5;
 input double             InpAutoRRLevel    = 2.0;
+//--- trading modes + safety (Phase 33; default = safest)
+input ENUM_FM_TRADE_MODE InpTradeMode      = TRADE_ANALYSIS_ONLY;
+input string             InpLiveToken      = "";    // must equal TRADE_LIVE for live
+input bool               InpEmergencyStop  = false;
+input double             InpMaxDrawdownPct = 20.0;  // %, 0=off
+input int                InpSessionStartH  = 0;     // server hour, start==end = always
+input int                InpSessionEndH    = 24;
+input bool               InpCloseOnHalt    = false;
 
 CFMConfig         g_cfg;
 CLogger           g_log;
@@ -71,6 +81,9 @@ CRiskManager      g_risk;
 CExecutionEngine  g_exec;
 CPositionManager  g_pos;
 CTradeIntentBuilder g_intent;
+CSafetyManager    g_safety;
+CPaperTrader      g_paper;
+bool              g_haltLogged = false;
 datetime          g_last_bar = 0;
 long              g_bars = 0;
 long              g_selCount[STRAT_COUNT];
@@ -94,6 +107,13 @@ int OnInit()
                    InpTrailStepPts, InpUseBreakEven, InpBETriggerPts,
                    InpBEOffsetPts);
    g_intent.Configure(InpTradeProvisional, InpMaxHoldBars, InpChaseATRMult);
+   g_safety.Configure(InpTradeMode, InpLiveToken, InpEmergencyStop,
+                      InpMaxDailyLoss, InpMaxDrawdownPct,
+                      InpSessionStartH, InpSessionEndH, InpCloseOnHalt);
+   g_paper.Configure(InpMaxOpenPos);
+   PrintFormat("[FM_EA] mode=%s acctTradeMode=%d",
+               CSafetyManager::ModeName(InpTradeMode),
+               (int)AccountInfoInteger(ACCOUNT_TRADE_MODE));
    // Restart recovery: adopt already-open magic positions (logged, generic).
    PositionFix adopted[];
    int nAdopt = g_pos.Refresh(_Symbol, adopted);
@@ -111,6 +131,9 @@ void OnDeinit(const int reason)
    for(int i = 1; i < STRAT_COUNT; i++)
       s += StringFormat(" %s=%d", CStrategyRegistry::StrategyName((ENUM_FM_STRATEGY)i), g_selCount[i]);
    PrintFormat("[FM_EA] done bars=%d riskOK=%d veto=%d selections:%s reason=%d", g_bars, g_riskOK, g_veto, s, reason);
+   PaperStats ps;
+   g_paper.Stats(ps);
+   PrintFormat("[FM_EA] %s", g_paper.Summary());
   }
 
 void OnTick()
@@ -136,6 +159,31 @@ void OnTick()
    if(!g_analysis.Update(rates, count, g_cfg, 1, res))
       return;
    g_bars++;
+
+   // Phase 33: settle PAPER virtuals on the just-closed bar, then evaluate
+   // safety for this bar (halt latches; session is a pause).
+   string paperLog = "";
+   g_paper.SettleBar(_Symbol, rates[1].high, rates[1].low, rates[1].time, paperLog);
+   if(paperLog != "")
+      PrintFormat("[FM_EA] %s %s", TimeToString(rates[1].time), paperLog);
+   MqlDateTime hdt;
+   TimeToStruct(rates[1].time, hdt);
+   string safeWhy = "";
+   bool safeGo = g_safety.Evaluate(AccountInfoDouble(ACCOUNT_EQUITY),
+                                   g_risk.DailyPL(), hdt.hour, safeWhy);
+   string haltReason = "";
+   bool halted = g_safety.Halted(haltReason);
+   if(halted && !g_haltLogged)
+     {
+      g_haltLogged = true;
+      PrintFormat("[FM_EA] HALT %s", haltReason);
+      if(g_safety.CloseOnHalt())
+        {
+         string clog = "";
+         int nClosed = g_pos.CloseAll(_Symbol, clog);
+         PrintFormat("[FM_EA] HALT_CLOSE n=%d %s", nClosed, clog);
+        }
+     }
 
    // Phase 26: manage owned positions (BE/trail; strategy-permits are all-true
    // until Phases 27–30 attach per-strategy rules) + closed-deal accounting.
@@ -238,6 +286,34 @@ void OnTick()
             TradeExplanation ex;
             CTradeExplainer::Build(ti, res, rd, cand, vetoWhy, ex);
             PrintFormat("[FM_EA] EXPLAIN %s", CTradeExplainer::RenderText(ex));
+            // Phase 33: mode execution (ANALYSIS_ONLY logs only).
+            if(!safeGo)
+               intentTxt += " HALT_" + safeWhy;
+            else if(InpTradeMode == TRADE_PAPER)
+              {
+               if(g_paper.Open(_Symbol, ti, rd.volume, rd.riskMoney, px, res.barTime))
+                  intentTxt += " PAPER_OPEN";
+               else
+                  intentTxt += " PAPER_FULL";
+              }
+            else if(InpTradeMode == TRADE_DEMO || InpTradeMode == TRADE_LIVE)
+              {
+               string allowWhy = "";
+               if(!g_safety.RealOrdersAllowed(allowWhy))
+                  intentTxt += " BLOCK_" + allowWhy;
+               else
+                 {
+                  ExecResult er;
+                  string cm = CPositionManager::MakeComment(ti.strategy, 0);
+                  if(ti.dir > 0)
+                     er = g_exec.Buy(_Symbol, rd.volume, ti.stop, ti.objective, cm);
+                  else
+                     er = g_exec.Sell(_Symbol, rd.volume, ti.stop, ti.objective, cm);
+                  intentTxt += StringFormat(" EXEC_%s", er.reason);
+                  if(er.ok)
+                     g_risk.NotifyTradeOpened();
+                 }
+              }
            }
          else
             intentTxt = "SKIP_" + why;
