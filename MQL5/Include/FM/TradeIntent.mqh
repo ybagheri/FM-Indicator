@@ -65,6 +65,24 @@ private:
       return true;
      }
 
+   // Entry-side guard (Phase 41 fix): market must be on the correct side of
+   // the stop or the fill inverts risk (found via regime table: SELL filled
+   // above its stop). BUY needs price > stop; SELL needs price < stop.
+   bool              GateSide(int dir, double stop, double price, string &why) const
+     {
+      if(dir > 0 && !(price > stop))
+        {
+         why = "WRONG_SIDE";
+         return false;
+        }
+      if(dir < 0 && !(price < stop))
+        {
+         why = "WRONG_SIDE";
+         return false;
+        }
+      return true;
+     }
+
    // Chase guard (mirrors Phase-8 late rule): market already beyond entry
    // toward objective by more than chase×ATR → LATE_ENTRY.
    bool              GateChase(int dir, double entry, double price, double atr,
@@ -125,6 +143,8 @@ public:
          return false;
       if(!GateChase(s.dir, s.entry, price, res.atr, skipWhy))
          return false;
+      if(!GateSide(s.dir, s.stop, price, skipWhy))
+         return false;
       FillFromSetup(in, STRAT_FM_FADE, s);
       in.invalidation = "STOP";
       for(int i = 0; i < res.fmPlanCount; i++)
@@ -159,6 +179,8 @@ public:
          return false;
       if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
          return false;
+      if(!GateSide(s.dir, s.stop, price, skipWhy))
+         return false;
       FillFromSetup(in, STRAT_FAILED_BO, s);
       in.invalidation = "STOP_failed_level";
       in.note = StringFormat("Failed-BO fade %s score=%d R=%.2f",
@@ -180,6 +202,8 @@ public:
       if(!GateProvisional(s.provisional, skipWhy))
          return false;
       if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
+         return false;
+      if(!GateSide(s.dir, s.stop, price, skipWhy))
          return false;
       FillFromSetup(in, STRAT_PULLBACK, s);
       in.invalidation = "STOP_pullback_extreme";
@@ -203,6 +227,8 @@ public:
       if(!GateProvisional(s.provisional, skipWhy))
          return false;
       if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
+         return false;
+      if(!GateSide(s.dir, s.stop, price, skipWhy))
          return false;
       FillFromSetup(in, STRAT_BREAKOUT, s);
       in.invalidation = (s.provisional ? "STALE_or_ref_reclaim"
@@ -229,6 +255,8 @@ public:
          return false;
       if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
          return false;
+      if(!GateSide(s.dir, s.stop, price, skipWhy))
+         return false;
       FillFromSetup(in, STRAT_REVERSAL, s);
       in.invalidation = "STOP_mtr_anchor";
       in.note = StringFormat("MTR %s score=%d R=%.2f%s",
@@ -250,6 +278,8 @@ public:
       if(!GateProvisional(s.provisional, skipWhy))
          return false;
       if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
+         return false;
+      if(!GateSide(s.dir, s.stop, price, skipWhy))
          return false;
       FillFromSetup(in, STRAT_DOUBLE, s);
       in.invalidation = "STOP_double_level";

@@ -29,6 +29,13 @@ def chase_ok(direction, entry, price, atr, mult=0.5):
     return (True, "")
 
 
+def side_ok(direction, stop, price):
+    """Mirror of GateSide: fill must not invert risk."""
+    if direction > 0:
+        return (True, "") if price > stop else (False, "WRONG_SIDE")
+    return (True, "") if price < stop else (False, "WRONG_SIDE")
+
+
 def fm_match(plans, fade_dir, entry):
     """plans: list of dicts(valid,fadeDir,entry,invalidClose)."""
     for p in plans:

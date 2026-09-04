@@ -349,8 +349,9 @@ void OnTick()
                intentTxt += " HALT_" + safeWhy;
             else if(InpTradeMode == TRADE_PAPER)
               {
-               if(g_paper.Open(_Symbol, ti, rd.volume, rd.riskMoney, px, res.barTime))
-                  intentTxt += " PAPER_OPEN";
+               string ctxName = CMarketState::StateName(res.mstate.state);
+               if(g_paper.Open(_Symbol, ti, rd.volume, rd.riskMoney, px, res.barTime, ctxName))
+                  intentTxt += StringFormat(" PAPER_OPEN ctx=%s", ctxName);
                else
                   intentTxt += " PAPER_FULL";
               }

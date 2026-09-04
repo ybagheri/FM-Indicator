@@ -244,6 +244,21 @@ Chart/alerts    Execution/risk   CSV/backtest
   NO per-symbol tuning applied (§25 — unjustified by this evidence).
   Report committed: `reports/T-020_XAUUSD-H1_AUTO_DEMO.htm`.
 
-## 18. Later (PLANNED)
+## 18. Phase 41 — Regime Analysis + Entry-Side Fix ✅ DONE (commit: this phase)
 
-Phases 41–42 regime analysis + AUTO validation; 43–44 paper/live review.
+- `PaperTrader` carries entry regime (`ctx=` on OPEN/CLOSE). T-021 PAPER
+  H1 (post-fix): 6 trades 2/4 +403.51 avgR 0.67 — TRADING_RANGE 2/4 +704.63,
+  BULL_TREND 0/2 −226.16 (n=6: hypothesis-grade only, no claims).
+- REAL BUG found via the table: fills could occur on the WRONG SIDE of the
+  stop (SELL filled above its stop → inverted risk, phantom +R). Fixed with
+  `GateSide` in all six `From*` builders (BUY needs price>stop, SELL
+  price<stop) + mirror `side_ok` + 5 suites. 4 such fills blocked in-window.
+- Re-ran all DEMO baselines post-fix (AUTO/PB/DBL): numbers IDENTICAL
+  (fix only binds the 4 cases; send-time stop-level had covered DEMO).
+  Baselines stand verified across rebuilds.
+- Account note: terminal stays on real 15144344 (unfunded — live orders
+  impossible; tester runs use simulated deposit and are unaffected).
+
+## 19. Later (PLANNED)
+
+Phases 42–44 AUTO validation, paper readiness, live-readiness review.

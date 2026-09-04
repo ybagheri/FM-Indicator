@@ -24,6 +24,7 @@ struct VirtualPosition
    double            volume;
    double            riskMoney;
    datetime          openedBar;
+   string            ctx;           // Phase 41: market-state at entry (regime)
   };
 
 struct PaperStats
@@ -74,7 +75,8 @@ public:
 
    // Virtual market fill at price px (EA passes current ask/bid).
    bool              Open(string sym, const TradeIntent &in, double volume,
-                          double riskMoney, double px, datetime barTime)
+                          double riskMoney, double px, datetime barTime,
+                          string ctxName)
      {
       if(!in.valid || OpenCount() >= m_maxOpen)
          return false;
@@ -90,6 +92,7 @@ public:
       m_pos[n].volume = volume;
       m_pos[n].riskMoney = (riskMoney > 0 ? riskMoney : 1e-9);
       m_pos[n].openedBar = barTime;
+      m_pos[n].ctx = ctxName;
       return true;
      }
 
@@ -138,9 +141,9 @@ public:
          if(profit < m_stats.maxLoss)
             m_stats.maxLoss = profit;
          rSum += r;
-         log += StringFormat("PAPER_CLOSE %s %s exit=%s R=%.2f P=%.2f ",
+         log += StringFormat("PAPER_CLOSE %s %s ctx=%s exit=%s R=%.2f P=%.2f ",
                              CStrategyRegistry::StrategyName(m_pos[i].strategy),
-                             how, DoubleToString(exitPx, 8), r, profit);
+                             how, m_pos[i].ctx, DoubleToString(exitPx, 8), r, profit);
          m_pos[i].open = false;
         }
       return rSum;

@@ -2,7 +2,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from trade_intent import (permits, provisional_ok, chase_ok, fm_match,
-                          failedbo_geometry, explain_alternates,
+                          failedbo_geometry, explain_alternates, side_ok,
                           STRAT_FM_FADE, STRAT_PULLBACK, STRAT_BREAKOUT,
                           STRAT_REVERSAL, STRAT_DOUBLE,
                           STRAT_FAILED_BO)
@@ -78,10 +78,19 @@ def test_explain_alternates():
     check_n("cap_11", len(explain_alternates(many, 1, "")) == 11)
 
 
+def test_side_gate():
+    check_n("buy_ok", side_ok(+1, 1.1500, 1.1550)[0])
+    check_n("buy_inverted", side_ok(+1, 1.1500, 1.1490) == (False, "WRONG_SIDE"))
+    check_n("buy_on_stop", side_ok(+1, 1.1500, 1.1500) == (False, "WRONG_SIDE"))
+    check_n("sell_ok", side_ok(-1, 1.1550, 1.1500)[0])
+    check_n("sell_inverted", side_ok(-1, 1.1500, 1.1565) == (False, "WRONG_SIDE"))
+
+
 if __name__ == "__main__":
     test_permits()
     test_provisional()
     test_chase()
+    test_side_gate()
     test_fm_match()
     test_failedbo_geometry()
     test_explain_alternates()

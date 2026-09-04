@@ -238,6 +238,19 @@ Census:          riskOK=118 veto=369 (PB 66/BO 4/DBL 63)
 Runtime errors:  0. Report: reports/T-020_XAUUSD-H1_AUTO_DEMO.htm
 ```
 
+## Run T-021 — MT5 BACKTEST (PAPER, regime-tagged, post-fix) ✅ PASS
+
+```text
+Git commit:      Phase-41 HEAD (GateSide + paper ctx)
+EA version:      FM_EA 1.00, PAPER, rest defaults, same H1 window
+Result:          Test passed (124811 ticks, 528 bars)
+Virtual:         6 trades, 2/4, +403.51, avgR 0.67
+Regime:          TRADING_RANGE 2/4 +704.63 · BULL_TREND 0/2 -226.16 (n=6)
+Blocked:         SKIP_WRONG_SIDE x4 (the inverted fills)
+Runtime errors:  0
+Pre-fix T-013 numbers (+3605) are SUPERSEDED (contained phantom-R fills).
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers
