@@ -101,10 +101,26 @@ Chart/alerts    Execution/risk   CSV/backtest
   mode). MT5 BACKTEST T-007: pass, census byte-identical to T-006,
   0 errors. Live-order proof deferred to Phase 34 baselines (honest).
 
-## 7. Later (PLANNED)
+## 7. Phase 26 — Position Management ✅ DONE (commit: this phase)
 
-Phase 26 position layer; 27–30 strategy wiring;
-31 AUTO + conflict resolution; 32 explanation; 33 safety + modes;
-34+ baselines/optimization/OOS/walk-forward per strategy. Each phase:
-implement → compile → unit tests → MT5 test → inspect → document →
-commit → push.
+- New `MQL5/Include/FM/PositionManager.mqh`: `PositionFix` record,
+  `CPositionManager::Configure/Refresh/Count/HasOpen/ModifySLTP/
+  MaybeBreakEven/MaybeTrail/ClosePosition/CloseAll/PartialClose/
+  ScanClosedDeals`. Magic+symbol filtered (foreign never touched);
+  `FM|<strategy>|<setupId>` comment codec with restart adoption;
+  stop-level/freeze validation on modify; retcode-checked close/partial.
+  Restart rule: first deal scan fast-forwards (no history replay into P/L).
+- Mirror: `tests/positions.py` + `tests/test_positions.py` (codec, BE,
+  trail) — pass. Total UNIT TEST: 110.
+- EA: per-bar Refresh + BE/trail (strategy-permits all-true until 27–30) +
+  closed-deal → risk accounting + init adoption log.
+- MT5 BACKTEST T-008: pass, census identical (528/481, 1/293/14/0/220),
+  0 errors. Modify/close paths untested live (no positions exist while
+  execution dormant) — honest gap, closed in Phase 34.
+
+## 8. Later (PLANNED)
+
+Phases 27–30 strategy wiring; 31 AUTO + conflict resolution; 32 explanation;
+33 safety + modes; 34+ baselines/optimization/OOS/walk-forward per strategy.
+Each phase: implement → compile → unit tests → MT5 test → inspect →
+document → commit → push.

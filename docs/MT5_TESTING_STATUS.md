@@ -103,6 +103,18 @@ Runtime errors:  0
 Trades:          0 (execution dormant) → trading metrics N/A
 ```
 
+## Run T-008 — MT5 BACKTEST (EA + positions layer, still no orders) ✅ PASS
+
+```text
+Git commit:      Phase-26 HEAD (PositionManager wired: BE/trail/deal-scan)
+EA version:      FM_EA 1.00
+Symbol/TF/Dates/Model/Balance: same as T-005/T-006/T-007
+Result:          Test passed (124811 ticks, 528 bars)
+Census:          byte-identical (bars=528 riskOK=481, 1/293/14/0/220)
+Runtime errors:  0
+Trades:          0 → trading metrics N/A; modify/close paths not yet exercised
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers

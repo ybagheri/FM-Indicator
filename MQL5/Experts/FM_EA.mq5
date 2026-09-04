@@ -16,6 +16,7 @@
 #include <FM/StrategyRegistry.mqh>
 #include <FM/RiskManager.mqh>
 #include <FM/ExecutionEngine.mqh>  // Phase 25: constructed+configured, no calls yet
+#include <FM/PositionManager.mqh>  // Phase 26: manage/BE/trail owned positions
 #include <FM/Inputs.mqh>       // shared analysis inputs (verbatim)
 
 //--- EA inputs (Phase 23: selection + identity only; trading inputs later)
@@ -42,6 +43,13 @@ input int                InpMaxSpreadPts   = 50;    // points, 0=off
 input double             InpRiskMinRR      = 1.0;   // 0=off
 //--- execution inputs (Phase 25: configured only; orders need Phase 33 mode)
 input int                InpSlippagePts    = 10;
+//--- position inputs (Phase 26; strategy-permits refined in Phases 27-30)
+input bool               InpUseTrailing    = false;
+input int                InpTrailStartPts  = 300;
+input int                InpTrailStepPts   = 50;
+input bool               InpUseBreakEven   = true;
+input int                InpBETriggerPts   = 300;
+input int                InpBEOffsetPts    = 20;
 
 CFMConfig         g_cfg;
 CLogger           g_log;
@@ -49,6 +57,7 @@ CFMAnalysis       g_analysis;
 CStrategyRegistry g_registry;
 CRiskManager      g_risk;
 CExecutionEngine  g_exec;
+CPositionManager  g_pos;
 datetime          g_last_bar = 0;
 long              g_bars = 0;
 long              g_selCount[STRAT_COUNT];
@@ -67,6 +76,14 @@ int OnInit()
                     InpMaxPerSymbol, InpMaxConsecLoss, InpMaxSpreadPts,
                     InpRiskMinRR, InpMagic);
    g_exec.Configure(InpMagic, InpSlippagePts, InpMaxSpreadPts);
+   g_pos.Configure(InpMagic, InpSlippagePts, InpUseTrailing, InpTrailStartPts,
+                   InpTrailStepPts, InpUseBreakEven, InpBETriggerPts,
+                   InpBEOffsetPts);
+   // Restart recovery: adopt already-open magic positions (logged, generic).
+   PositionFix adopted[];
+   int nAdopt = g_pos.Refresh(_Symbol, adopted);
+   if(nAdopt > 0)
+      PrintFormat("[FM_EA] adopted %d open position(s) on init", nAdopt);
    ArrayInitialize(g_selCount, 0);
    PrintFormat("[FM_EA] init OK mode=%s magic=%d history=%d (ANALYSIS_ONLY, no orders)",
                CStrategyRegistry::ModeName(InpStratMode), InpMagic, InpHistoryBars);
@@ -104,6 +121,26 @@ void OnTick()
    if(!g_analysis.Update(rates, count, g_cfg, 1, res))
       return;
    g_bars++;
+
+   // Phase 26: manage owned positions (BE/trail; strategy-permits are all-true
+   // until Phases 27–30 attach per-strategy rules) + closed-deal accounting.
+   PositionFix mine[];
+   g_pos.Refresh(_Symbol, mine);
+   for(int i = 0; i < ArraySize(mine); i++)
+     {
+      ModifyResult mr;
+      if(g_pos.MaybeBreakEven(mine[i], true, mr) && mr.ok)
+         PrintFormat("[FM_EA] BE #%d %s", mine[i].ticket, mr.reason);
+      if(g_pos.MaybeTrail(mine[i], true, mr) && mr.ok)
+         PrintFormat("[FM_EA] TRAIL #%d %s", mine[i].ticket, mr.reason);
+     }
+   double closedProfits[];
+   int nClosed = g_pos.ScanClosedDeals(closedProfits);
+   for(int i = 0; i < nClosed; i++)
+     {
+      g_risk.NotifyTradeClosed(closedProfits[i]);
+      PrintFormat("[FM_EA] closed profit=%.2f", closedProfits[i]);
+     }
 
    StrategyCandidate cand[];
    int n = g_registry.BuildCandidates(res, cand);
