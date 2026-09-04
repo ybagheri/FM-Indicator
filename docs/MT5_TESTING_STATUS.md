@@ -78,6 +78,19 @@ Runtime errors:  0
 Trades:          0 (no order code exists yet) → trading metrics N/A
 ```
 
+## Run T-006 — MT5 BACKTEST (EA + risk layer, still no orders) ✅ PASS
+
+```text
+Git commit:      Phase-24 HEAD (RiskManager + EA wiring)
+EA version:      FM_EA 1.00 / risk defaults (1% equity, minRR 1.0, maxSpread 50pt)
+Symbol/TF/Dates/Model/Balance: same as T-005
+Result:          Test passed (124811 ticks, 528 bars)
+Selections:      identical to T-005 (1/293/14/0/220 — analysis untouched)
+Risk:            OK=481 / LOW_RR=47
+Runtime errors:  0
+Trades:          0 (no order code yet) → trading metrics N/A
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers

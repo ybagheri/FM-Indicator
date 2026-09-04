@@ -70,9 +70,24 @@ Chart/alerts    Execution/risk   CSV/backtest
   NO_TRADE intelligence is Phase 8-decision gating + Phase 31, not yet wired
   into the EA path (honest gap, see §6).
 
-## 5. Later (PLANNED)
+## 5. Phase 24 — Risk Management ✅ DONE (commit: this phase)
 
-Phases 24–26 risk/execution/position layers; 27–30 strategy wiring;
+- New `MQL5/Include/FM/RiskManager.mqh`: `ENUM_LOT_MODE` (FIXED/RISK_PCT/
+  MONEY), `RiskDecision{allowed,reason,volume,riskMoney,rMult}`,
+  `CRiskManager::Configure/OnNewDay/NotifyTradeClosed/NotifyTradeOpened/
+  ComputeVolume/Check` (veto order NO_SETUP→LOW_RR→HIGH_SPREAD→DAILY_LOSS→
+  MAX_TRADES_DAY→CONSEC_LOSSES→MAX_OPEN→MAX_PER_SYMBOL→OK). Volume via
+  `OrderCalcProfit` + symbol step/min/max normalization; stop-level is an
+  execution-layer check (Phase 25, needs live prices).
+- Mirror: `tests/risk_manager.py` + `tests/test_risk.py` (gates, volume
+  norm, day-book) — pass. Total UNIT TEST: 105.
+- EA wires Check per selection (logs `risk=REASON vol=`; still no orders).
+- MT5 BACKTEST T-006 (same H1 window): pass, selections identical to T-005,
+  riskOK=481 / LOW_RR=47, 0 errors.
+
+## 6. Later (PLANNED)
+
+Phases 25–26 execution/position layers; 27–30 strategy wiring;
 31 AUTO + conflict resolution; 32 explanation; 33 safety + modes;
 34+ baselines/optimization/OOS/walk-forward per strategy. Each phase:
 implement → compile → unit tests → MT5 test → inspect → document →
