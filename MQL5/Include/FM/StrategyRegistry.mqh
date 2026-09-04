@@ -148,8 +148,8 @@ public:
             bestIdx = i;
             continue;
            }
-         const GeneralSetup &a = cand[i].setup;
-         const GeneralSetup &b = cand[bestIdx].setup;
+         GeneralSetup a = cand[i].setup;
+         GeneralSetup b = cand[bestIdx].setup;
          bool aWins = false;
          if(a.score != b.score)
             aWins = (a.score > b.score);

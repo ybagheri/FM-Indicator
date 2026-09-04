@@ -58,6 +58,26 @@ Alerts:          FM POTENTIAL/CONFIRMED Alert: lines present (alert path live)
 Trades:          0 (by design) → win rate / PF / drawdown: N/A
 ```
 
+## Run T-005 — MT5 BACKTEST (EA skeleton, ANALYSIS_ONLY) ✅ PASS
+
+```text
+Git commit:      Phase-23 HEAD (FM_EA v1.00, engine aa60515 + shared inputs)
+EA version:      FM_EA 1.00 / Indicator v1.30 (adapter)
+Symbol:          EURUSD
+Timeframe:       H1
+Date range:      2025.11.03 – 2025.12.03
+Model:           1 (1-minute OHLC)
+Spread:          broker current (not fixed)
+Commission:      none
+Initial balance: 10000 USD, 1:100
+Parameters:      all defaults, mode=AUTO, all strategies enabled
+Result:          Test passed in 0:00:00 (124811 ticks, 528 bars)
+Bars analyzed:   528; selections FM_FADE=1 / PULLBACK=293 / BREAKOUT=14 /
+                 REVERSAL_MTR=0 / DOUBLE=220
+Runtime errors:  0
+Trades:          0 (no order code exists yet) → trading metrics N/A
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers

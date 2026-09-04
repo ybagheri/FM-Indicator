@@ -53,11 +53,22 @@ Chart/alerts    Execution/risk   CSV/backtest
 - FAILED_BO as a separate strategy deferred to Phase 28 (needs
   inverse-family plumbing in the trade intent).
 
-## 4. Phase 23 — EA Skeleton (PLANNED, ANALYSIS_ONLY first)
+## 4. Phase 23 — EA Skeleton ✅ DONE (commit: this phase, ANALYSIS_ONLY)
 
-EA adapter calls `CFMAnalysis::Update` per new closed bar, attaches strategy
-+ explanation records, makes BUY/SELL/WAIT/NO_TRADE decisions — places NO
-orders until Phases 24–26 (risk/execution/positions) land and baselines pass.
+- New `MQL5/Include/FM/Inputs.mqh`: analysis inputs moved VERBATIM from the
+  indicator (same names/order/defaults → `.set` presets keep loading);
+  `FM_ApplyInputs(cfg)` shared. Indicator adopts it (behavior unchanged).
+- New `MQL5/Experts/FM_EA.mq5` v1.00: `CFMAnalysis` + `CStrategyRegistry`,
+  new-closed-bar gating, 1500-bar history, per-bar selection log,
+  `OnDeinit` per-strategy census. NO order functions exist yet.
+- Registry mirror: `tests/strategy_registry.py` + `tests/test_registry.py`
+  (5 suites: single/multi/auto/tie-breaks/empty+determinism) — all pass.
+  Total UNIT TEST: 102 (97+5).
+- MT5 BACKTEST T-005 (EURUSD H1 11.03–12.03, defaults, AUTO): pass, 528 bars,
+  selections FM_FADE=1/PULLBACK=293/BREAKOUT=14/REVERSAL=0/DOUBLE=220,
+  0 orders (by design), 0 errors. Note: selection fires almost every bar —
+  NO_TRADE intelligence is Phase 8-decision gating + Phase 31, not yet wired
+  into the EA path (honest gap, see §6).
 
 ## 5. Later (PLANNED)
 
