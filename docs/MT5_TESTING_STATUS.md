@@ -225,6 +225,19 @@ dates in the wrong section and silently ran the full window — caught by
 checking the agent "testing of ... from" line).
 ```
 
+## Run T-020 — MT5 BACKTEST (XAUUSD cross-check) ✅ PASS
+
+```text
+Git commit:      Phase-40 HEAD (no code change — same EA build)
+EA version:      FM_EA 1.00, AUTO DEMO defaults
+Symbol/TF/Dates: XAUUSD H1 2025.11.03–12.03, Model 1, $10k
+Result:          Test passed (119459 ticks, 502 bars)
+Trades:          10, 5/5, net +158.32, PF 1.33, exp +15.83,
+                 balDD 402.93 (4.03%), eqDD 722.01 (7.08%)
+Census:          riskOK=118 veto=369 (PB 66/BO 4/DBL 63)
+Runtime errors:  0. Report: reports/T-020_XAUUSD-H1_AUTO_DEMO.htm
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers

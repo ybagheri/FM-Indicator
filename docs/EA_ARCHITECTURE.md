@@ -235,6 +235,15 @@ Chart/alerts    Execution/risk   CSV/backtest
   promote anything. Reports `T-018*`, `T-019*` committed.
 - Process lesson recorded: `[Tester]` keys must precede `[TesterInputs]`.
 
-## 17. Later (PLANNED)
+## 17. Phase 40 — Multi-Symbol Validation ✅ DONE (commit: this phase)
 
-Phases 40–42 multi-symbol/regime/AUTO validation; 43–44 paper/live review.
+- T-020 XAUUSD H1 AUTO DEMO (same window/defaults): 502 bars, 10 trades
+  5/5, +158.32, PF 1.33, exp +15.83, balDD 4.03%, eqDD 7.08%, veto 369.
+- Comparison: EURUSD AUTO 3 trades −353.49 PF 0.00 vs XAUUSD 10 trades
+  +158.32 PF 1.33. Different symbols behave differently (expected);
+  NO per-symbol tuning applied (§25 — unjustified by this evidence).
+  Report committed: `reports/T-020_XAUUSD-H1_AUTO_DEMO.htm`.
+
+## 18. Later (PLANNED)
+
+Phases 41–42 regime analysis + AUTO validation; 43–44 paper/live review.

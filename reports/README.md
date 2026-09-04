@@ -26,6 +26,12 @@
 - Balance DD 268.69 (2.63%) · Equity DD 316.93 (3.08%)
 - Files: `T-016_SINGLE_DBL_DEMO_EURUSD-H1.htm`
 
+## T-020 — XAUUSD AUTO (multi-symbol, Phase 40)
+
+- Trades 10 · Wins 5 (50%) · Net +158.32 · PF 1.33 · Expectancy +15.83
+- Balance DD 402.93 (4.03%) · Equity DD 722.01 (7.08%)
+- Files: `T-020_XAUUSD-H1_AUTO_DEMO.htm`
+
 ## Reading
 
 Weak/choppy-window baselines are EXPECTED at this stage (82% structural
