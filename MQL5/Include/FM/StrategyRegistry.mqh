@@ -48,6 +48,16 @@ struct StrategySelection
    GeneralSetup      setup;
   };
 
+// Phase 31: AUTO tuning (context-aware conflict resolution). All bonuses are
+// additive score points, documented in TRADE_DECISION_SPECIFICATION.md.
+struct AutoTuning
+  {
+   int               trendBonus;   // ± for alignment with state winner
+   int               provPenalty;  // extra provisional caution
+   int               rrBonus;      // reward for rMult >= rrLevel
+   double            rrLevel;
+  };
+
 class CStrategyRegistry
   {
 private:
@@ -177,12 +187,8 @@ public:
       return true;
      }
 
-   // Deterministic selection under the configured mode. Phase-22 rule:
-   // highest setup score among enabled+valid candidates; ties broken by
-   // lower ENUM_FM_STRATEGY value, then lower entry price. Provisional
-   // setups are eligible but lose ties to firm ones. Richer context-aware
-   // conflict resolution arrives in Phase 31; the rule is NOT changed
-   // silently — Phase 31 documents and replaces this section.
+   // SINGLE/MULTI selection (Phase-22 score-max rule, unchanged).
+   // AUTO mode uses SelectAuto (Phase 31) instead.
    StrategySelection Select(const StrategyCandidate &cand[]) const
      {
       StrategySelection sel;
@@ -218,6 +224,80 @@ public:
          sel.hasTrade = true;
          sel.strategy = cand[bestIdx].strategy;
          sel.setup = cand[bestIdx].setup;
+        }
+      return sel;
+     }
+
+   // Phase 31 — AUTO final score: setup score + context alignment
+   // (±trendBonus vs state-winner direction) − provPenalty (provisional) +
+   // rrBonus (rMult ≥ rrLevel). Structural vetoes (barbwire/mid-range/
+   // conflict/no-edge/trap) belong to the Phase-8 decision and are applied
+   // by the EA (DECISION_VETO_*), not here.
+   static int        ContextDir(ENUM_MARKET_STATE st)
+     {
+      if(st == MS_BULL_TREND || st == MS_BULL_CHANNEL)
+         return +1;
+      if(st == MS_BEAR_TREND || st == MS_BEAR_CHANNEL)
+         return -1;
+      return 0;   // RANGE/BREAKOUT_MODE/TRANSITION/UNKNOWN: no directional edge
+     }
+
+   int               AutoFinal(const StrategyCandidate &c,
+                               const FMAnalysisResult &res,
+                               const AutoTuning &t) const
+     {
+      int f = c.setup.score;
+      int ctx = ContextDir(res.mstate.state);
+      if(ctx != 0 && res.mstate.valid)
+         f += (c.setup.dir == ctx ? t.trendBonus : -t.trendBonus);
+      if(c.setup.provisional)
+         f -= t.provPenalty;
+      if(c.setup.rMult + 1e-9 >= t.rrLevel)
+         f += t.rrBonus;
+      return f;
+     }
+
+   // Phase-31 AUTO selection. Replaces the Phase-22 score-max rule (which
+   // remains for SINGLE/MULTI via Select). Deterministic: max final score;
+   // ties → firm beats provisional → lower strategy enum → lower entry.
+   // Returns final score via finalOut (-1 when no trade).
+   StrategySelection SelectAuto(const StrategyCandidate &cand[],
+                                const FMAnalysisResult &res,
+                                const AutoTuning &t, int &finalOut) const
+     {
+      StrategySelection sel;
+      sel.hasTrade = false;
+      sel.strategy = STRAT_NONE;
+      CGeneralSetups::InitNone(sel.setup);
+      finalOut = -1;
+      int bestIdx = -1;
+      int bestFinal = -1000000;
+      for(int i = 0; i < ArraySize(cand); i++)
+        {
+         if(!cand[i].valid || !cand[i].enabled || !cand[i].setup.valid)
+            continue;
+         int f = AutoFinal(cand[i], res, t);
+         bool wins = false;
+         if(bestIdx < 0 || f != bestFinal)
+            wins = (bestIdx < 0 || f > bestFinal);
+         else if(cand[i].setup.provisional != cand[bestIdx].setup.provisional)
+            wins = (cand[bestIdx].setup.provisional && !cand[i].setup.provisional);
+         else if(cand[i].strategy != cand[bestIdx].strategy)
+            wins = (cand[i].strategy < cand[bestIdx].strategy);
+         else
+            wins = (cand[i].setup.entry < cand[bestIdx].setup.entry);
+         if(wins)
+           {
+            bestIdx = i;
+            bestFinal = f;
+           }
+        }
+      if(bestIdx >= 0)
+        {
+         sel.hasTrade = true;
+         sel.strategy = cand[bestIdx].strategy;
+         sel.setup = cand[bestIdx].setup;
+         finalOut = bestFinal;
         }
       return sel;
      }

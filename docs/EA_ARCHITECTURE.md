@@ -152,10 +152,24 @@ Chart/alerts    Execution/risk   CSV/backtest
   calibration (0.5×ATR, 5-bar hold) is Phase-34 tuning material.
 - 0 errors throughout.
 
-## 10. Later (PLANNED)
+## 10. Phase 31 — AUTO + Conflict Resolution ✅ DONE (commit: this phase)
 
-Phase 31 AUTO + conflict resolution; 32 explanation; 33 safety + modes;
-31 AUTO + conflict resolution; 32 explanation; 33 safety + modes; 31 AUTO + conflict resolution; 32 explanation;
-33 safety + modes; 34+ baselines/optimization/OOS/walk-forward per strategy.
-Each phase: implement → compile → unit tests → MT5 test → inspect →
-document → commit → push.
+- Registry: `AutoTuning` + `ContextDir` + `AutoFinal` + `SelectAuto`
+  (replaces score-max for AUTO only; SINGLE/MULTI keep Phase-22 rule).
+  New `docs/TRADE_DECISION_SPECIFICATION.md` (pipeline, AUTO formula with
+  worked §10 example, veto table, NO-TRADE doctrine).
+- EA: AUTO branch (logs `final=`), all-mode Phase-8 structural veto
+  (`DECISION_VETO_*`: barbwire/mid-range/conflict/no-edge/trap).
+- Mirror: auto/conflict/veto suites — pass. Total UNIT TEST: ~120.
+- MT5 BACKTEST T-011 (H1 window, 3 runs): AUTO 93 sel/86 riskOK/435 veto;
+  SINGLE_PB 78/69/381 (+69 no-candidate); SINGLE_DBL 93/93/435.
+  Veto reasons sampled: CONFLICT/MID_RANGE (context-driven, mode-independent;
+  counts differ only via hasTrade coverage — verified consistent). EA is now
+  highly selective (82% veto in this choppy window) — calibration, Phase 34.
+  Order-level AUTO-vs-single comparison needs execution (honest gap).
+
+## 11. Later (PLANNED)
+
+Phase 32 explanation; 33 safety + modes; 34+ baselines/optimization/OOS/
+walk-forward per strategy. Each phase: implement → compile → unit tests →
+MT5 test → inspect → document → commit → push.

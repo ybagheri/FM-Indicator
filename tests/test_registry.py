@@ -1,7 +1,8 @@
 """test_registry.py — Phase-22 registry suites (mirror of StrategyRegistry.mqh)."""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from strategy_registry import (select, map_type, MODE_SINGLE, MODE_MULTI,
+from strategy_registry import (select, select_auto, auto_final, decision_veto,
+                               map_type, context_dir, MODE_SINGLE, MODE_MULTI,
                                MODE_AUTO, STRAT_FM_FADE, STRAT_PULLBACK,
                                STRAT_BREAKOUT)
 
@@ -59,6 +60,48 @@ def test_full_map():
     check("map_none", map_type("NOPE") == 0)
 
 
+def test_auto_conflict():
+    TUN = {"trendBonus": 10, "provPenalty": 5, "rrBonus": 5, "rrLevel": 2.0}
+    uses = {1: True, 2: True, 3: True, 4: True, 5: True, 6: True}
+
+    def A(t, score, d, prov=False, entry=1.0, r=1.5):
+        return {"type": t, "score": score, "dir": d, "provisional": prov,
+                "entry": entry, "rMult": r, "valid": True}
+
+    # §10 example shape: pullback BUY 84 vs FM SELL 41 in bull context.
+    cands = [A("PULLBACK", 84, +1), A("BREAKOUT", 76, +1),
+             A("FM_FADE", 41, -1), A("REVERSAL", 38, -1)]
+    ok, st, _, f = select_auto(cands, "BULL_TREND", True, TUN, uses)
+    check("auto_bull_pb", ok and st == STRAT_PULLBACK and f == 94)
+    # Bear context flips a close race: SELL 76+10=86 beats BUY 84-10=74.
+    cands = [A("PULLBACK", 84, +1), A("BREAKOUT", 76, -1)]
+    ok, st, _, f = select_auto(cands, "BEAR_TREND", True, TUN, uses)
+    check("auto_bear_flip", ok and st == STRAT_BREAKOUT and f == 86)
+    # Range context: no alignment swing, raw score + RR bonus decides.
+    cands = [A("PULLBACK", 70, +1, r=2.5), A("DOUBLE", 70, -1, r=1.0)]
+    ok, st, _, f = select_auto(cands, "TRADING_RANGE", True, TUN, uses)
+    check("auto_range_rr", ok and st == STRAT_PULLBACK and f == 75)
+    # Provisional penalty visible in final.
+    c = A("PULLBACK", 70, +1, prov=True)
+    check("auto_prov_pen", auto_final(c, "BULL_TREND", True, TUN) == 75)
+    # Invalid state pcts (UNKNOWN): no alignment either way.
+    c = A("PULLBACK", 70, +1)
+    check("auto_unknown", auto_final(c, "UNKNOWN", False, TUN) == 70)
+    # Empty -> NO_TRADE with final -1.
+    check("auto_empty", select_auto([], "BULL_TREND", True, TUN, uses)[0] is False)
+
+
+def test_decision_veto():
+    for r in ("BARBWIRE", "MID_RANGE", "CONFLICT", "NO_EDGE", "TRAP_REPEAT"):
+        check("veto_%s" % r.lower(), decision_veto(r) == "DECISION_VETO_" + r)
+    check("veto_ok_empty", decision_veto("OK") == "")
+    check("veto_lowscore_native", decision_veto("LOW_SCORE") == "")
+    check("veto_late_native", decision_veto("LATE_ENTRY") == "")
+    check("ctx_bull", context_dir("BULL_CHANNEL") == +1)
+    check("ctx_bear", context_dir("BEAR_TREND") == -1)
+    check("ctx_range", context_dir("TRADING_RANGE") == 0)
+
+
 def test_empty_no_trade():
     ok, st, s = select([], MODE_AUTO, STRAT_FM_FADE, USES_ALL)
     check("empty_no_trade", (not ok) and st == 0 and s is None)
@@ -79,5 +122,7 @@ if __name__ == "__main__":
     test_auto_max()
     test_tiebreaks()
     test_full_map()
+    test_auto_conflict()
+    test_decision_veto()
     test_empty_no_trade()
     print("ALL REGISTRY TESTS PASSED")

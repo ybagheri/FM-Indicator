@@ -52,5 +52,54 @@ def select(cands, mode, single, uses):
     return (True, best[0], best[1])
 
 
+# --- Phase 31: AUTO conflict resolution (mirror of SelectAuto/AutoFinal) ---
+# states: BULL_TREND/BULL_CHANNEL=+1, BEAR_*=-1, else 0 (no edge).
+def context_dir(state):
+    if state in ("BULL_TREND", "BULL_CHANNEL"):
+        return +1
+    if state in ("BEAR_TREND", "BEAR_CHANNEL"):
+        return -1
+    return 0
+
+
+def auto_final(c, state, state_valid, tuning):
+    f = c["score"]
+    ctx = context_dir(state)
+    if ctx != 0 and state_valid:
+        f += tuning["trendBonus"] if c["dir"] == ctx else -tuning["trendBonus"]
+    if c["provisional"]:
+        f -= tuning["provPenalty"]
+    if c["rMult"] + 1e-9 >= tuning["rrLevel"]:
+        f += tuning["rrBonus"]
+    return f
+
+
+def select_auto(cands, state, state_valid, tuning, uses):
+    best = None  # (final, strategy-enum, entry, cand)
+    for c in cands:
+        if not c.get("valid", False):
+            continue
+        st = map_type(c["type"])
+        if st == 0 or not uses.get(st, False):
+            continue
+        f = auto_final(c, state, state_valid, tuning)
+        key = (f, c["provisional"] is False, -st, -c["entry"])
+        if best is None or key > best[0]:
+            best = (key, st, c)
+    if best is None:
+        return (False, 0, None, -1)
+    return (True, best[1], best[2], auto_final(best[2], state, state_valid,
+                                              tuning))
+
+
+# Phase-8 structural vetoes the EA applies in ALL modes (mirror of the
+# EA veto block; score/RR/late vetoes live natively in risk/chase).
+VETO_REASONS = {"BARBWIRE", "MID_RANGE", "CONFLICT", "NO_EDGE", "TRAP_REPEAT"}
+
+
+def decision_veto(reason):
+    return ("DECISION_VETO_" + reason) if reason in VETO_REASONS else ""
+
+
 if __name__ == "__main__":
     print("mirror import OK")

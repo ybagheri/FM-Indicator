@@ -145,6 +145,21 @@ Note:            pullback 293/293 late is stale-level skips (spot-verified),
                  not a gate bug; chase calibration deferred to Phase 34.
 ```
 
+## Run T-011 — MT5 BACKTEST (AUTO + veto + SINGLE comparisons) ✅ PASS
+
+```text
+Git commit:      Phase-31 HEAD (SelectAuto + all-mode structural veto)
+EA version:      FM_EA 1.00
+Symbol/TF/Dates/Model/Balance: same H1 window (3 runs, input overrides only)
+AUTO:            93 selections (PB 58/BO 3/DBL 32), 86 riskOK, 435 veto
+SINGLE_PB:       78 selections, 69 riskOK, 381 veto (+69 bars no candidate)
+SINGLE_DBL:      93 selections, 93 riskOK, 435 veto
+Veto reasons:    CONFLICT / MID_RANGE sampled (context-driven, verified
+                 mode-independent; counts differ only via hasTrade coverage)
+Runtime errors:  0
+Trades:          0 → trading metrics N/A (order-level AUTO comparison in Ph.34)
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers
