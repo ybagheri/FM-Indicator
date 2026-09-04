@@ -1,4 +1,4 @@
-# TESTING — FM Indicator v1.2 + v2 research + Phase-1..6 engines
+# TESTING — FM Indicator v1.2 + v2 research + Phase-1..8 engines
 
 ## Method
 
@@ -10,12 +10,14 @@
 - Breakout oracle: `tests/breakout.py` (1:1 mirror of BREAKOUT_ENGINE.md).
 - Reversal oracle: `tests/reversal.py` (1:1 mirror of REVERSAL_ENGINE.md).
 - Setup oracle: `tests/setup_engine.py` (1:1 mirror of SETUP_ENGINE.md).
-- Run: `python3 -m pytest tests/ -q` → 74 tests, ALL PASS (19 FM + 7 bar +
-  10 pullback + 9 state + 9 breakout + 10 reversal + 10 setup;
-  or per-file via `__main__`).
+- General oracle: `tests/general_setups.py` (1:1 mirror of GENERAL_SETUPS.md).
+- Decision oracle: `tests/decision.py` (1:1 mirror of DECISION_ENGINE.md).
+- Run: `python3 -m pytest tests/ -q` → 94 tests, ALL PASS (19 FM + 7 bar +
+  10 pullback + 9 state + 9 breakout + 10 reversal + 10 setup + 10 general +
+  10 decision; or per-file via `__main__`).
 - MQL5 compile: MetaEditor on Windows (F7). Linux env has no
   `metaeditor.exe`/`wine`; static check = balanced-delimiter scan
-  (comment/string-stripped) over all 19 MQL5 files → OK.
+  (comment/string-stripped) over all 21 MQL5 files → OK.
 
 ## Cases → expected
 
@@ -88,6 +90,26 @@
 | 65 | Provisional + families | DEVELOPING prov; all 5 families pass through | PASS |
 | 66 | InvalidClose + safety | ±over echo; disabled/zero-ATR/bad-dir safe | PASS |
 | 67 | Plan determinism | identical re-run | PASS |
+| 68 | Pullback H2 firm | entry/stop/obj/R exact, score 70 | PASS |
+| 69 | Pullback H1 provisional | tick/buf math, score 40, bear mirror | PASS |
+| 70 | Swing double-top | entry/stop/trough/R exact, score 60 | PASS |
+| 71 | Micro double + bottom mirror | provisional, score 30; buy geometry | PASS |
+| 72 | Breakout FOLLOW + trap | firm, score 70→50 on trap | PASS |
+| 73 | Breakout PENDING/FAILED | provisional 40; FAILED/none silent | PASS |
+| 74 | Reversal MAJOR/MINOR | firm 80 / provisional 40, EMA stop | PASS |
+| 75 | General RR + invalid | MinRR flag; bad obj / zero risk invalid | PASS |
+| 76 | Selection + safety | max-score wins, type-order ties; disabled/zero-ATR/bad-dir safe | PASS |
+| 77 | General determinism + freeze | identical re-run; extension untouched | PASS |
+| 78 | Clean BUY/SELL | direction pass-through with OK | PASS |
+| 79 | Disabled + no setup | NO_TRADE DISABLED/NO_SETUP | PASS |
+| 80 | Barbwire + mid-range | NO_TRADE structural vetoes | PASS |
+| 81 | Conflict + no-edge | CONFLICT veto; UNKNOWN-guard; TRANSITION→NO_EDGE ordering | PASS |
+| 82 | Low score + low RR | WAIT both sides incl. boundary 40 | PASS |
+| 83 | Late chase | WAIT both sides past 0.5×ATR | PASS |
+| 84 | Trap repeat | NO_TRADE ≥2 fails; FOLLOW rescues; <2 passes | PASS |
+| 85 | Priority order | barbwire > mid-range > conflict > score | PASS |
+| 86 | Zero-ATR late guard | no crash, no false late | PASS |
+| 87 | Decision determinism + freeze | identical re-call; pure inputs | PASS |
 
 ## Coverage map (prompt §TESTING 1–12 + v1.2/v2)
 
@@ -133,6 +155,20 @@ extreme vs on target zone; invalid on objective-beyond-entry and on zero
 risk; MinRR flag both sides; provisional flag + all-five-family
 passthrough; invalidClose echo + disabled/zero-ATR/bad-dir safety;
 determinism.
+Phase 7 general setups (`test_general.py`, 10 suites): pullback H2 firm
+geometry (tick-proxy entry, buffered stop, window objective, score 70);
+H1 provisional + bear mirror (score 40); swing double-top geometry exact
+(score 60); micro provisional (score 30) + double-bottom mirror; breakout
+FOLLOW firm + trap penalty (70→50); PENDING provisional (40) + FAILED
+silence; reversal MAJOR firm (80, EMA stop) + MINOR provisional (40);
+MinRR threshold + invalid reward/risk; selection (max-score, type-order
+ties) + disabled/zero-ATR/bad-dir safety; determinism + freeze.
+Phase 8 decisions (`test_decision.py`, 10 suites): clean BUY/SELL
+pass-through; disabled + no-setup; barbwire + mid-range structural vetoes;
+conflict veto (UNKNOWN-guard, TRANSITION→NO_EDGE ordering); low-score
+(boundary 40 earns) + low-RR waits; late chase veto both sides; trap-repeat
+veto + follow rescue + sub-threshold pass; priority order; zero-ATR safety;
+determinism + freeze (pure inputs).
 
 ## Reproduce
 

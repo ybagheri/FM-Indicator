@@ -14,6 +14,8 @@ MQL5/Include/FM/
    BreakoutEngine.mqh CBreakoutEngine (Phase 4: BO events + FOLLOW/FAILED + trap flag, read-only)
    ReversalEngine.mqh CExhaustionAnalyzer + CLegCounter + CMajorReversal (Phase 5: exhaustion + legs + MTR proxy, read-only)
    SetupEngine.mqh   CSetupPlanner (Phase 6: FM entry/stop/objective/R plans, read-only)
+   GeneralSetups.mqh CGeneralSetups (Phase 7: pullback/double/BO/MTR catalog + SelectBest, read-only)
+   DecisionEngine.mqh CDecisionEngine (Phase 8: BUY/SELL/WAIT/NO_TRADE + reasons, read-only)
   Swings.mqh        CSwingDetector (fractal-k, confirmed-only output)
   Context.mqh       CContextClassifier (Trend/Range/Transition + confidence)
   MeasuredMove.mqh  CLeg, CMeasuredMove (regular + inverse projection)
@@ -24,7 +26,9 @@ MQL5/Include/FM/
   Logger.mqh        CLogger (OFF/ERROR/INFO/DEBUG)
 Include/FM/ expected under MQL5/Include/FM/ on user terminal.
 tests/fm_engine.py   Python 1:1 mirror of spec (oracle for TESTING.md)
-tests/test_*.py      synthetic + anti-repaint suites
+tests/bar_analyzer.py + pullback_patterns.py + market_state.py + breakout.py
+  + reversal.py + setup_engine.py + general_setups.py + decision.py (oracles)
+tests/test_*.py      synthetic + anti-repaint suites (94 total)
 docs/*.md            RESEARCH / SPEC / ARCH / TESTING / ROADMAP
 ```
 
@@ -38,6 +42,10 @@ rates[] → CMarketData.Refresh (new-bar detect, freeze closes)
    → CBreakoutEngine.Analyze (Phase 4 read-only DEBUG log when found)
    → CExhaustionAnalyzer/CLegCounter/CMajorReversal (Phase 5 read-only DEBUG log when found)
    → CSetupPlanner.Plan per DEVELOPING/CONFIRMED setup (Phase 6 read-only DEBUG log when valid)
+   → CGeneralSetups catalog: pullback/double/BO/MTR builders + SelectBest +
+      FM-plan contest (Phase 7 read-only DEBUG log when valid)
+   → CDecisionEngine.Decide on the winning candidate + context flags
+      (Phase 8 read-only DEBUG log + FM_DECISION label, never gates FM)
    → CSwingDetector.Update (confirmed swings only)
   → CMeasuredMove.Project (legs → projections, inverse if enabled)
   → CContextClassifier.Update → CConfirmation.Evaluate
@@ -80,6 +88,18 @@ Tick with no new closed bar: only optional intrabar POTENTIAL preview
   beyond signal extreme AND target zone + ATR buffer; B0 objective; R +
   report-only `rrOK`; invalidation close echo) + `Describe()`; reads
   `CFMSetup` snapshots, writes nothing (Phase 6, read-only).
+- `CGeneralSetups`: static pure `FromPullbackBull/Bear` (tick-proxy entry,
+  pullback-low stop, window-extreme objective; H2 firm / H1 provisional) +
+  `FromDouble` (level+tol stop, trough objective; swing firm / micro
+  provisional) + `FromBreakout` (FOLLOW firm / PENDING provisional, FAILED
+  silent, trap penalty) + `FromReversal` (MAJOR firm / MINOR provisional,
+  EMA-anchored stop) + `SelectBest` (max score, type-order ties) +
+  `Describe()`; reads Phase 2/4/5 signals, writes nothing (Phase 7, read-only).
+- `CDecisionEngine`: static pure `Decide` (spec §3 veto priority:
+  DISABLED → NO_SETUP → BARBWIRE → MID_RANGE → CONFLICT → NO_EDGE →
+  LOW_SCORE → LOW_RR → LATE_ENTRY → TRAP_REPEAT → BUY/SELL) +
+  `IsConflict`/`IsLate` helpers + `Describe()`; hook draws the single
+  `FM_DECISION` label (Phase 8, read-only).
 - `CSwingDetector`: `AddBar()`; outputs `Swing{index, price, dir, confirmed_bar}`.
   Internal pending buffer of size k; never exposes unconfirmed.
 - `CMeasuredMove : CMeasuredMoveBase` with subclasses

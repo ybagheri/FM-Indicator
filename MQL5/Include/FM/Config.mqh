@@ -67,10 +67,20 @@ public:
     double            RevRetestTolATRMult;
     int               RevMinPressure;
     bool              EnableReversal;     // master switch; false = layer idle
-    // Phase 6 FM setup plans (docs/SETUP_ENGINE.md §1)
-    double            SetupStopBufATRMult;
-    double            SetupMinRR;
-    bool              EnableSetup;        // master switch; false = layer idle
+     // Phase 6 FM setup plans (docs/SETUP_ENGINE.md §1)
+     double            SetupStopBufATRMult;
+     double            SetupMinRR;
+     bool              EnableSetup;        // master switch; false = layer idle
+     // Phase 7 general setups (docs/GENERAL_SETUPS.md §1)
+     bool              EnableGeneralSetups; // master switch; false = layer idle
+     double            GeneralTickProxyATRMult; // pullback entry beyond extreme
+     double            GeneralObjectiveATRMult; // BO/reversal objective (xATR)
+     // Phase 8 decision engine (docs/DECISION_ENGINE.md §1)
+     bool              EnableDecision;     // master switch; false = layer idle
+     int               MinDecisionScore;   // min setup score for a direction
+     double            MaxLateEntryATRMult; // chase veto distance (xATR)
+     int               DecisionConflictPpts; // top-two pct gap = conflict
+     int               DecisionMaxFailedBO; // failed-BO trap-repeat threshold
    ENUM_CTX_FILTER   ContextFilter;
    ENUM_FM_PRICE_MODE PriceMode;   // HIGHLOW = candles, CLOSE = line chart
    int               MaxActiveSetups;
@@ -117,7 +127,11 @@ public:
        BOTrapLookback=20; EnableBreakout=true;
        RevLookback=10; RevRetestTolATRMult=0.25; RevMinPressure=5;
        EnableReversal=true;
-       SetupStopBufATRMult=0.10; SetupMinRR=1.0; EnableSetup=true;
+        SetupStopBufATRMult=0.10; SetupMinRR=1.0; EnableSetup=true;
+        EnableGeneralSetups=true; GeneralTickProxyATRMult=0.05;
+        GeneralObjectiveATRMult=2.0;
+        EnableDecision=true; MinDecisionScore=40; MaxLateEntryATRMult=0.50;
+        DecisionConflictPpts=10; DecisionMaxFailedBO=2;
       ContextFilter=CTX_LOG_ONLY; PriceMode=FM_PRICE_HIGHLOW;
       MaxActiveSetups=20; MaxBarsForward=100;
       UseIntrabarPotential=false; AtrPeriod=14;
@@ -209,10 +223,22 @@ public:
        if(RevRetestTolATRMult>1.0) { RevRetestTolATRMult=1.0; ok=false; }
        if(RevMinPressure<3) { RevMinPressure=3; ok=false; }
        if(RevMinPressure>10) { RevMinPressure=10; ok=false; }
-       if(SetupStopBufATRMult<0.0) { SetupStopBufATRMult=0.0; ok=false; }
-       if(SetupStopBufATRMult>1.0) { SetupStopBufATRMult=1.0; ok=false; }
-       if(SetupMinRR<0.25) { SetupMinRR=0.25; ok=false; }
-       if(SetupMinRR>5.0) { SetupMinRR=5.0; ok=false; }
+        if(SetupStopBufATRMult<0.0) { SetupStopBufATRMult=0.0; ok=false; }
+        if(SetupStopBufATRMult>1.0) { SetupStopBufATRMult=1.0; ok=false; }
+        if(SetupMinRR<0.25) { SetupMinRR=0.25; ok=false; }
+        if(SetupMinRR>5.0) { SetupMinRR=5.0; ok=false; }
+        if(GeneralTickProxyATRMult<0.0) { GeneralTickProxyATRMult=0.0; ok=false; }
+        if(GeneralTickProxyATRMult>0.5) { GeneralTickProxyATRMult=0.5; ok=false; }
+        if(GeneralObjectiveATRMult<0.5) { GeneralObjectiveATRMult=0.5; ok=false; }
+        if(GeneralObjectiveATRMult>5.0) { GeneralObjectiveATRMult=5.0; ok=false; }
+        if(MinDecisionScore<0) { MinDecisionScore=0; ok=false; }
+        if(MinDecisionScore>100) { MinDecisionScore=100; ok=false; }
+        if(MaxLateEntryATRMult<0.0) { MaxLateEntryATRMult=0.0; ok=false; }
+        if(MaxLateEntryATRMult>2.0) { MaxLateEntryATRMult=2.0; ok=false; }
+        if(DecisionConflictPpts<5) { DecisionConflictPpts=5; ok=false; }
+        if(DecisionConflictPpts>30) { DecisionConflictPpts=30; ok=false; }
+        if(DecisionMaxFailedBO<1) { DecisionMaxFailedBO=1; ok=false; }
+        if(DecisionMaxFailedBO>5) { DecisionMaxFailedBO=5; ok=false; }
        return ok;
      }
   };

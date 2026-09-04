@@ -307,4 +307,4 @@ Risks: R uses our stop/target proxies — honest about construction.
 | Wedge/push exhaustion | DONE (v1.2) | `Confirmation::PushCount/IsWedge` |
 | Context Trend/Range/Transition | DONE (v1) → extend Phase 3/4 | `Context.mqh` |
 | MM/FM module | DONE (v1–v1.2) | `MeasuredMove.mqh`, `FMEngine.mqh` |
-| H1/H2/L1/L2, doubles, MTR, breakout-mode, S/R, setup/decision engines | PLANNED Phases 4–8 | specs `BAR_BY_BAR_ENGINE.md`, `MARKET_CONTEXT.md` |
+| H1/H2/L1/L2, doubles, MTR, breakout-mode, setup/decision engines | DONE Phases 2/4/5/7/8 | `PullbackPatterns/Breakout/Reversal/GeneralSetups/DecisionEngine.mqh` |

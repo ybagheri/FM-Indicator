@@ -41,6 +41,8 @@
 #include <FM/BreakoutEngine.mqh>
 #include <FM/ReversalEngine.mqh>
 #include <FM/SetupEngine.mqh>
+#include <FM/GeneralSetups.mqh>
+#include <FM/DecisionEngine.mqh>
 #include <FM/MeasuredMove.mqh>
 #include <FM/FMEngine.mqh>
 #include <FM/Visualizer.mqh>
@@ -98,6 +100,14 @@ input bool   InpEnableReversal      = true;  // Phase 5: reversal engine (read-o
 input double InpSetupStopBufATRMult = 0.10;  // Phase 6: stop buffer beyond structure (xATR)
 input double InpSetupMinRR          = 1.0;   // Phase 6: R flag threshold (report-only)
 input bool   InpEnableSetup         = true;  // Phase 6: FM setup plans (read-only)
+input bool   InpEnableGeneralSetups = true;  // Phase 7: non-FM setup catalog (read-only)
+input double InpGeneralTickProxyATRMult = 0.05; // Phase 7: pullback entry beyond extreme (xATR)
+input double InpGeneralObjectiveATRMult = 2.0;  // Phase 7: BO/reversal objective (xATR)
+input bool   InpEnableDecision      = true;  // Phase 8: BUY/SELL/WAIT/NO_TRADE + reasons (read-only)
+input int    InpMinDecisionScore    = 40;    // Phase 8: min setup score for a direction
+input double InpMaxLateEntryATRMult = 0.50;  // Phase 8: chase veto past entry (xATR)
+input int    InpDecisionConflictPpts= 10;    // Phase 8: top-two state pct gap = conflict
+input int    InpDecisionMaxFailedBO = 2;     // Phase 8: failed-BO trap-repeat threshold
 input int    InpMTFTrendTFMinutes   = 0;      // v2 MTF overlay: 0=off, else higher-TF minutes
 input bool   InpExportCSV           = false;  // v2: write signals CSV on new CONFIRMED
 input string InpCSVFile             = "FM_signals.csv";
@@ -179,6 +189,14 @@ void ApplyInputsToConfig()
    g_cfg.SetupStopBufATRMult=InpSetupStopBufATRMult;
    g_cfg.SetupMinRR=InpSetupMinRR;
    g_cfg.EnableSetup=InpEnableSetup;
+   g_cfg.EnableGeneralSetups=InpEnableGeneralSetups;
+   g_cfg.GeneralTickProxyATRMult=InpGeneralTickProxyATRMult;
+   g_cfg.GeneralObjectiveATRMult=InpGeneralObjectiveATRMult;
+   g_cfg.EnableDecision=InpEnableDecision;
+   g_cfg.MinDecisionScore=InpMinDecisionScore;
+   g_cfg.MaxLateEntryATRMult=InpMaxLateEntryATRMult;
+   g_cfg.DecisionConflictPpts=InpDecisionConflictPpts;
+   g_cfg.DecisionMaxFailedBO=InpDecisionMaxFailedBO;
    g_cfg.ContextFilter=InpContextFilterMode;
    g_cfg.PriceMode=InpPriceMode;
    g_cfg.MaxActiveSetups=InpMaxActiveSetups; g_cfg.MaxBarsForward=InpMaxBarsForward;
@@ -387,8 +405,179 @@ int OnCalculate(const int rates_total,
              if(sh<1) continue;
              SetupPlan pl=CSetupPlanner::Plan(rates[sh],s.dir,s.target,s.b0.price,
                 g_atr.At(1),g_cfg,s.id,s.family,s.state==FM_CONFIRMED,sh);
-             if(pl.valid) g_log.Debug(CSetupPlanner::Describe(pl));
+              if(pl.valid) g_log.Debug(CSetupPlanner::Describe(pl));
+             }
+          }
+       // Phase 7 general setup catalog (read-only; never gates the state machine).
+       GeneralSetup genBest; CGeneralSetups::InitNone(genBest);
+       bool haveGen=false;
+       double atrNow7=g_atr.At(1);
+       if(g_cfg.EnableGeneralSetups && atrNow7>0)
+         {
+          GeneralSetup cand[];
+          ArrayResize(cand,0);
+          int wEnd7=1+g_cfg.MaxPullbackBars;
+          if(wEnd7>=rates_total) wEnd7=rates_total-1;
+          int td7=CPullbackPatterns::TrendDir(rates,rates_total,1,atrNow7,g_cfg);
+          if(td7>0)
+            {
+             PullbackSignal pbB=CPullbackPatterns::DetectBull(rates,rates_total,1,atrNow7,g_cfg);
+             if(pbB.found && pbB.signalBar>=1 && pbB.signalBar<rates_total)
+               {
+                double winH=rates[1].high;
+                for(int w=2;w<=wEnd7;w++) if(rates[w].high>winH) winH=rates[w].high;
+                GeneralSetup g=CGeneralSetups::FromPullbackBull(pbB,rates[pbB.signalBar].high,pbB.stop,winH,atrNow7,g_cfg);
+                if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
+               }
             }
+          else if(td7<0)
+            {
+             PullbackSignal pbS=CPullbackPatterns::DetectBear(rates,rates_total,1,atrNow7,g_cfg);
+             if(pbS.found && pbS.signalBar>=1 && pbS.signalBar<rates_total)
+               {
+                double winL=rates[1].low;
+                for(int w=2;w<=wEnd7;w++) if(rates[w].low<winL) winL=rates[w].low;
+                GeneralSetup g=CGeneralSetups::FromPullbackBear(pbS,rates[pbS.signalBar].low,pbS.stop,winL,atrNow7,g_cfg);
+                if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
+               }
+            }
+          DoubleSignal darr[4];
+          darr[0]=CPullbackPatterns::FindDoubleTop(sw,atrNow7,g_cfg);
+          darr[1]=CPullbackPatterns::FindDoubleBottom(sw,atrNow7,g_cfg);
+          darr[2]=CPullbackPatterns::MicroDoubleTop(rates,rates_total,1,atrNow7,g_cfg);
+          darr[3]=CPullbackPatterns::MicroDoubleBottom(rates,rates_total,1,atrNow7,g_cfg);
+          for(int di=0;di<4;di++)
+            {
+             if(!darr[di].found) continue;
+             int b1=darr[di].bar1, b2=darr[di].bar2;
+             if(b1<1||b2<1||b1>=rates_total||b2>=rates_total) continue;
+             int lo=(b2<b1?b2:b1), hi=(b2<b1?b1:b2);
+             double trough=0; bool tInit=false;
+             for(int k=lo;k<=hi;k++)
+               {
+                double v=(darr[di].dir<0?rates[k].low:rates[k].high);
+                if(!tInit) { trough=v; tInit=true; }
+                else if(darr[di].dir<0) { if(v<trough) trough=v; }
+                else { if(v>trough) trough=v; }
+               }
+             if(!tInit) continue;
+             GeneralSetup g=CGeneralSetups::FromDouble(darr[di],trough,atrNow7,g_cfg);
+             if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
+            }
+          BreakoutSignal bo7=CBreakoutEngine::Analyze(rates,rates_total,1,atrNow7,sw,g_cfg);
+          if(bo7.found)
+            {
+             GeneralSetup g=CGeneralSetups::FromBreakout(bo7,close[1],atrNow7,g_cfg);
+             if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
+            }
+          int revK=g_cfg.RevLookback;
+          if(revK<5) revK=5;
+          if(revK>50) revK=50;
+          double emaTail[];
+          CMajorReversal::EMA20Tail(rates,rates_total,1,revK,emaTail);
+          if(ArraySize(emaTail)>0)
+            {
+             ReversalSignal rvB=CMajorReversal::Analyze(rates,rates_total,1,atrNow7,sw,g_cfg,+1);
+             ReversalSignal rvS=CMajorReversal::Analyze(rates,rates_total,1,atrNow7,sw,g_cfg,-1);
+             if(rvB.found)
+               {
+                GeneralSetup g=CGeneralSetups::FromReversal(rvB,close[1],emaTail[0],atrNow7,g_cfg);
+                if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
+               }
+             if(rvS.found)
+               {
+                GeneralSetup g=CGeneralSetups::FromReversal(rvS,close[1],emaTail[0],atrNow7,g_cfg);
+                if(g.valid) { int n=ArraySize(cand); ArrayResize(cand,n+1); cand[n]=g; g_log.Debug(CGeneralSetups::Describe(g)); }
+               }
+            }
+          int best7=CGeneralSetups::SelectBest(cand);
+          if(best7>=0) { genBest=cand[best7]; haveGen=true; }
+          // FM contest: best DEVELOPING/CONFIRMED plan joins with its ScoreSignal
+          // and displaces the general best only on a strictly greater score.
+          int fmScoreBest=-1;
+          SetupPlan fmPlanBest; fmPlanBest.valid=false;
+          for(int i=0;i<g_engine.ActiveCount();i++)
+            {
+             CFMSetup s; if(!g_engine.GetSetup(i,s)) continue;
+             if(s.state!=FM_DEVELOPING && s.state!=FM_CONFIRMED) continue;
+             int sh=-1;
+             for(int k=1;k<rates_total;k++)
+               if(rates[k].time==s.signal_time) { sh=k; break; }
+             if(sh<1) continue;
+             SetupPlan pl=CSetupPlanner::Plan(rates[sh],s.dir,s.target,s.b0.price,
+                atrNow7,g_cfg,s.id,s.family,s.state==FM_CONFIRMED,sh);
+             if(!pl.valid) continue;
+             int fdir=-s.dir;
+             double dtAtr=(s.dir>0?(s.target-high[1]):(low[1]-s.target))/atrNow7;
+             int q=CConfirmation::ScoreSignal(rates,rates_total,1,fdir,g_cfg,s.dir,atrNow7,dtAtr,s.confidence);
+             if(q>fmScoreBest) { fmScoreBest=q; fmPlanBest=pl; }
+            }
+          if(fmPlanBest.valid && (!haveGen || fmScoreBest>genBest.score))
+            {
+             GeneralSetup f; CGeneralSetups::InitNone(f);
+             f.valid=true; f.type=SETUP_FM_FADE; f.dir=fmPlanBest.fadeDir;
+             f.entry=fmPlanBest.entry; f.stop=fmPlanBest.stop;
+             f.objective=fmPlanBest.objective;
+             f.riskPts=fmPlanBest.riskPts; f.rewardPts=fmPlanBest.rewardPts;
+             f.rMult=fmPlanBest.rMult; f.rrOK=fmPlanBest.rrOK;
+             f.provisional=fmPlanBest.provisional;
+             f.signalBar=fmPlanBest.signalShift; f.refPrice=fmPlanBest.entry;
+             f.score=fmScoreBest;
+             genBest=f; haveGen=true;
+             g_log.Debug(CGeneralSetups::Describe(f));
+            }
+         }
+       // Phase 8 decision engine (read-only; never gates the state machine).
+       if(g_cfg.EnableDecision)
+         {
+          DecisionContext dctx;
+          MarketState ms8=CMarketState::Analyze(rates,rates_total,1,atrNow7,g_cfg);
+          dctx.state=ms8.state;
+          dctx.pct[0]=ms8.pctBullTrend; dctx.pct[1]=ms8.pctBearTrend;
+          dctx.pct[2]=ms8.pctBullChannel; dctx.pct[3]=ms8.pctBearChannel;
+          dctx.pct[4]=ms8.pctRange; dctx.pct[5]=ms8.pctBreakout;
+          dctx.pctValid=ms8.valid;
+          BarFeatures bf8=CBarAnalyzer::Analyze(rates,rates_total,1,atrNow7,g_cfg);
+          dctx.barbwire=(bf8.valid && bf8.barbwire);
+          dctx.close=close[1];
+          dctx.midRange=false;
+          if(ms8.state==MS_TRADING_RANGE)
+            {
+             int L8=g_cfg.StateLookback;
+             if(L8<10) L8=10;
+             if(L8>=rates_total) L8=rates_total-1;
+             double hh=rates[1].high, ll=rates[1].low;
+             for(int w=2;w<=L8;w++)
+               {
+                if(rates[w].high>hh) hh=rates[w].high;
+                if(rates[w].low<ll) ll=rates[w].low;
+               }
+             if(hh>ll)
+               {
+                double pos=(close[1]-ll)/(hh-ll);
+                dctx.midRange=(pos>=1.0/3.0 && pos<=2.0/3.0);
+               }
+            }
+          dctx.failCount=0; dctx.hasFollow=false;
+          int scanN=20;
+          if(scanN>=rates_total) scanN=rates_total-1;
+          for(int j=1;j<=scanN;j++)
+            {
+             BreakoutSignal bj=CBreakoutEngine::Analyze(rates,rates_total,j,atrNow7,sw,g_cfg);
+             if(!bj.found) continue;
+             if(bj.outcome==BO_FAILED) dctx.failCount++;
+             if(bj.outcome==BO_FOLLOW_THROUGH) dctx.hasFollow=true;
+            }
+          Decision dec=CDecisionEngine::Decide(genBest,dctx,atrNow7,g_cfg);
+          g_log.Debug(CDecisionEngine::Describe(dec));
+          color dc=(dec.action==DEC_BUY?clrLime:(dec.action==DEC_SELL?clrRed:(dec.action==DEC_WAIT?clrOrange:clrGray)));
+          string dtxt=StringFormat("%s %s",CDecisionEngine::ActionName(dec.action),CDecisionEngine::ReasonName(dec.reason));
+          if(ObjectFind(0,"FM_DECISION")<0) ObjectCreate(0,"FM_DECISION",OBJ_TEXT,0,time[1],close[1]);
+          ObjectSetString(0,"FM_DECISION",OBJPROP_TEXT,dtxt);
+          ObjectSetInteger(0,"FM_DECISION",OBJPROP_COLOR,dc);
+          ObjectSetInteger(0,"FM_DECISION",OBJPROP_FONTSIZE,9);
+          ObjectSetInteger(0,"FM_DECISION",OBJPROP_ANCHOR,ANCHOR_RIGHT);
+          ObjectMove(0,"FM_DECISION",0,time[1],close[1]);
          }
       // v2 MTF overlay (read-only annotation; never gates the state machine).
       if(InpMTFTrendTFMinutes > 0)

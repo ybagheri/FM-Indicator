@@ -45,9 +45,19 @@
   (`REVERSAL_ENGINE.md` + `ReversalEngine.mqh` + mirror + 10 tests, read-only hook).
 - [x] Phase 6: FM as setup-engine module (entry/stop/target/R per setup)
   (`SETUP_ENGINE.md` + `SetupEngine.mqh` + mirror + 10 tests, read-only hook).
-- Phase 7: setup engine (trend-continuation, pullback, BO, reversals).
-- Phase 7: setup engine (trend-continuation, pullback, BO, reversals).
-- Phase 8: decision engine (BUY/SELL/WAIT/NO_TRADE + reasons) + visualization.
+- [x] Phase 7: general setup catalog — trend-pullback (H1/H2/L1/L2), swing +
+  micro doubles, breakout FOLLOW/PENDING, MTR MINOR/MAJOR — with
+  entry/stop/objective/R/score + best-candidate contest incl. FM plans
+  (`GENERAL_SETUPS.md` + `GeneralSetups.mqh` + mirror + 10 tests, read-only hook).
+- [x] Phase 8: decision engine (BUY/SELL/WAIT/NO_TRADE + machine-checkable
+  reasons per the §4 no-trade doctrine) + `FM_DECISION` label
+  (`DECISION_ENGINE.md` + `DecisionEngine.mqh` + mirror + 10 tests,
+  read-only hook; never gates FM, never trades).
+
+Bar-by-bar expansion Phases 1–8 COMPLETE (94 Python tests, all pass).
+Remaining: MetaEditor compile + Strategy Tester visual run (user-side);
+walk-forward/parameter review from exported CSV data; v3 EA in a separate
+repo (this indicator repo stays execution-free).
 
 Non-goals for this repo: auto-trading, profitability claims, repainted-history
 "perfect signals", per-tick CONFIRMED states.

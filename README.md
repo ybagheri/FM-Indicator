@@ -55,6 +55,15 @@ gating signals — see `docs/REVERSAL_ENGINE.md`.
 Phase-6 setup plans (read-only): per DEVELOPING/CONFIRMED setup entry /
 stop / objective / R + invalidation price, DEBUG-logged when valid, never
 gating signals — see `docs/SETUP_ENGINE.md`.
+Phase-7 general setups (read-only): pullback (H2 firm / H1 provisional) +
+swing/micro doubles + breakout FOLLOW/PENDING + MTR MAJOR/MINOR catalog with
+entry/stop/objective/R/score + best-candidate contest (FM included),
+DEBUG-logged when valid, never gating signals — see `docs/GENERAL_SETUPS.md`.
+Phase-8 decision engine (read-only): BUY/SELL/WAIT/NO_TRADE with
+machine-checkable reasons (barbwire / mid-range / conflict / no-edge /
+low-score / low-RR / late / trap-repeat), DEBUG-logged + single
+`FM_DECISION` chart label, never gating signals — see
+`docs/DECISION_ENGINE.md`.
 **Price mode** `InpPriceMode`: `High/Low` (candles, default) or `Close`
 (line chart — swings/legs/targets/distances on closes, like mobile
 line-chart MM analysis). Families v1.2 (default OFF): `InpEnableRangeMM` /
@@ -116,6 +125,8 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 `docs/BREAKOUT_ENGINE.md` ·
 `docs/REVERSAL_ENGINE.md` ·
 `docs/SETUP_ENGINE.md` ·
+`docs/GENERAL_SETUPS.md` ·
+`docs/DECISION_ENGINE.md` ·
 `docs/MARKET_CONTEXT.md` ·
 `docs/SYSTEMATIC_SPECIFICATION.md` ·
 `docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/FUTURE_ROADMAP.md`
