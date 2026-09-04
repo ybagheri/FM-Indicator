@@ -59,5 +59,24 @@ def failedbo_geometry(bo_dir, ref, atr, stop_buf_mult=0.10, tol_mult=0.25,
             "provisional": False, "valid": True}
 
 
+def explain_alternates(cands, winner_strategy, veto):
+    """Mirror of CTradeExplainer::Build alternate loop (cap 11)."""
+    alts = []
+    for c in cands:
+        if not c.get("valid", False) or c.get("strategy") == winner_strategy:
+            continue
+        if not c.get("enabled", False):
+            reason = "DISABLED_BY_MODE"
+        elif veto:
+            reason = veto
+        else:
+            reason = "LOST_SELECTION"
+        alts.append({"strategy": c["strategy"], "dir": c.get("dir", 0),
+                     "score": c.get("score", 0), "reason": reason})
+        if len(alts) >= 11:
+            break
+    return alts
+
+
 if __name__ == "__main__":
     print("mirror import OK")

@@ -160,6 +160,19 @@ Runtime errors:  0
 Trades:          0 → trading metrics N/A (order-level AUTO comparison in Ph.34)
 ```
 
+## Run T-012 — MT5 BACKTEST (EA + explanation records) ✅ PASS
+
+```text
+Git commit:      Phase-32 HEAD (TradeExplanation + EXPLAIN logging)
+EA version:      FM_EA 1.00, AUTO defaults
+Symbol/TF/Dates/Model/Balance: same H1 window
+Result:          Test passed (124811 ticks, 528 bars)
+Census:          identical to T-011 AUTO (86 riskOK / 435 veto)
+EXPLAIN blocks:  10, alternates + reject reasons verified in agent log
+Runtime errors:  0
+Trades:          0 → trading metrics N/A
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers

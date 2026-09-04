@@ -2,8 +2,9 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from trade_intent import (permits, provisional_ok, chase_ok, fm_match,
-                          failedbo_geometry, STRAT_FM_FADE, STRAT_PULLBACK,
-                          STRAT_BREAKOUT, STRAT_REVERSAL, STRAT_DOUBLE,
+                          failedbo_geometry, explain_alternates,
+                          STRAT_FM_FADE, STRAT_PULLBACK, STRAT_BREAKOUT,
+                          STRAT_REVERSAL, STRAT_DOUBLE,
                           STRAT_FAILED_BO)
 
 
@@ -59,10 +60,29 @@ def test_failedbo_geometry():
     check_n("fbo_zero_atr", failedbo_geometry(+1, 1.16, 0.0) is None)
 
 
+def test_explain_alternates():
+    cands = [{"valid": True, "strategy": 2, "dir": +1, "score": 84,
+              "enabled": True},
+             {"valid": True, "strategy": 5, "dir": -1, "score": 60,
+              "enabled": False},
+             {"valid": True, "strategy": 2, "dir": +1, "score": 70,
+              "enabled": True},
+             {"valid": False, "strategy": 3, "enabled": True}]
+    alts = explain_alternates(cands, 2, "")
+    check_n("winner_skipped", all(a["strategy"] != 2 for a in alts))
+    check_n("disabled_tag",
+            [a for a in alts if a["strategy"] == 5][0]["reason"] == "DISABLED_BY_MODE")
+    alts = explain_alternates(cands, 1, "DECISION_VETO_CONFLICT")
+    check_n("veto_tag", alts[0]["reason"] == "DECISION_VETO_CONFLICT")
+    many = [{"valid": True, "strategy": 9, "enabled": True}] * 15
+    check_n("cap_11", len(explain_alternates(many, 1, "")) == 11)
+
+
 if __name__ == "__main__":
     test_permits()
     test_provisional()
     test_chase()
     test_fm_match()
     test_failedbo_geometry()
+    test_explain_alternates()
     print("ALL INTENT TESTS PASSED")

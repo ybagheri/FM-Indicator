@@ -168,8 +168,16 @@ Chart/alerts    Execution/risk   CSV/backtest
   highly selective (82% veto in this choppy window) — calibration, Phase 34.
   Order-level AUTO-vs-single comparison needs execution (honest gap).
 
-## 11. Later (PLANNED)
+## 11. Phase 32 — Trade Explanation ✅ DONE (commit: this phase)
 
-Phase 32 explanation; 33 safety + modes; 34+ baselines/optimization/OOS/
-walk-forward per strategy. Each phase: implement → compile → unit tests →
-MT5 test → inspect → document → commit → push.
+- New `MQL5/Include/FM/TradeExplanation.mqh`: `TradeExplanation` record +
+  `CTradeExplainer::Build/RenderText` (engine-data-only; FM signal quality =
+  ScoreSignal, others N/A; alternates DISABLED_BY_MODE/veto/LOST_SELECTION).
+  New `docs/TRADE_EXPLANATION.md` (§36 map; modify/close reasons Phase 34).
+- Mirror: alternate-classification suites — pass. Total UNIT TEST: ~125.
+- MT5 BACKTEST T-012: pass, census identical to T-011 (86/435), 10 EXPLAIN
+  blocks with alternates verified in log, 0 errors.
+
+## 12. Later (PLANNED)
+
+Phase 33 safety + modes; 34+ baselines/optimization/OOS/walk-forward.

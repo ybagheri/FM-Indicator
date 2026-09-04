@@ -18,6 +18,7 @@
 #include <FM/ExecutionEngine.mqh>  // Phase 25: constructed+configured, no calls yet
 #include <FM/PositionManager.mqh>  // Phase 26: manage/BE/trail owned positions
 #include <FM/TradeIntent.mqh>      // Phase 27+: selection → trade intent
+#include <FM/TradeExplanation.mqh> // Phase 32: explainable decisions
 #include <FM/Inputs.mqh>       // shared analysis inputs (verbatim)
 
 //--- EA inputs (Phase 23: selection + identity only; trading inputs later)
@@ -230,8 +231,14 @@ void OnTick()
          else if(sel.strategy == STRAT_DOUBLE)
             made = g_intent.FromDouble(sel.setup, px, res.atr, why, ti);
          if(made)
+           {
             intentTxt = StringFormat("WOULD_%s %s",
                                      (ti.dir > 0 ? "BUY" : "SELL"), ti.note);
+            // Phase 32: explanation record from engine data only.
+            TradeExplanation ex;
+            CTradeExplainer::Build(ti, res, rd, cand, vetoWhy, ex);
+            PrintFormat("[FM_EA] EXPLAIN %s", CTradeExplainer::RenderText(ex));
+           }
          else
             intentTxt = "SKIP_" + why;
         }
