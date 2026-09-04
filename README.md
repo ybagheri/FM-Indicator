@@ -140,7 +140,10 @@ in a separate repo. No further indicator features are planned here.
 `docs/DECISION_ENGINE.md` ·
 `docs/MARKET_CONTEXT.md` ·
 `docs/SYSTEMATIC_SPECIFICATION.md` ·
-`docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/FUTURE_ROADMAP.md`
+`docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/VALIDATION.md` ·
+`docs/LIMITATIONS.md` · `docs/CONFIGURATION.md` · `docs/USER_GUIDE.md` ·
+`docs/ROADMAP.md` · `docs/FUTURE_ROADMAP.md` · `docs/FM_ENGINE.md` ·
+`docs/SIGNAL_SCORING.md` · `docs/NON_REPAINTING.md`
 
 ## Self-critique
 

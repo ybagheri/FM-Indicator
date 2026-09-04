@@ -142,3 +142,19 @@ confirmation modes extend `CConfirmation`; context modes extend enum. v2:
 EA reuse: `#include <FM/FMEngine.mqh>` + read DATA buffers or call
 `CFMEngine::ActiveSnapshots()` — no chart code required. v3 (separate repo):
 execution EA + optimization/walk-forward framework.
+
+## 7. Master-prompt §23 class map (names differ, responsibilities covered)
+
+| Master example | Here | Note |
+|---|---|---|
+| `CPriceActionEngine` | `FM_Indicator.mq5 OnCalculate` + `CFMEngine` | orchestration, not one god-class |
+| `CBarAnalyzer` | `BarAnalyzer.mqh CBarAnalyzer` | exact match (Phase 1) |
+| `CMarketContext` / `CTrendAnalyzer` / `CRangeAnalyzer` | `Context.mqh CContextClassifier` + `MarketState.mqh CMarketState` | EMA-gap + six-score states |
+| `CSwingDetector` / `CLegDetector` | `Swings.mqh` + `MeasuredMove.mqh` legs | confirmed-only swings |
+| `CPullbackAnalyzer` / `CSignalBarAnalyzer` | `PullbackPatterns.mqh` + `Confirmation.mqh` | H1/H2/L1/L2 + signal bar |
+| `CBreakoutAnalyzer` / `CFailedBreakoutAnalyzer` / `CFollowThroughAnalyzer` | `BreakoutEngine.mqh` + `CInverseMMHelper` + `CConfirmation` FT path | PENDING/FOLLOW/FAILED + trap |
+| `CReversalAnalyzer` / `CExhaustionAnalyzer` | `ReversalEngine.mqh` | breadth + legs + MTR proxy |
+| `CMeasuredMoveEngine` / `CFMEngine` | `MeasuredMove.mqh` + `FMEngine.mqh` | see `FM_ENGINE.md` |
+| `CSupportResistanceEngine` | swings + range HH/LL + BO refs + MM targets (no separate class) | see `LIMITATIONS.md` §2 |
+| `CTradeSetupEngine` / `CDecisionEngine` / `CConfidenceScorer` | `SetupEngine.mqh` + `GeneralSetups.mqh` + `DecisionEngine.mqh` + `ScoreSignal` | see `SIGNAL_SCORING.md` |
+| `CAlertManager` / `CVisualizationManager` / `CConfiguration` / `CLogger` | `Alerts.mqh` / `Visualizer.mqh` / `Config.mqh` / `Logger.mqh` | exact match |

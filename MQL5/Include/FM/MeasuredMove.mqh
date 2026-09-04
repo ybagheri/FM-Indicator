@@ -215,7 +215,7 @@ public:
       if(leg.dir > 0)
         {
          // bull leg: look for close above ext then close back below ext
-         double fhigh = 0; int flow = 0, failShift = -1;
+         double fhigh = 0, flow = 0; int failShift = -1;
          for(int s = from; s >= to; s--)
            {
             if(rates[s].high > fhigh) { fhigh = rates[s].high; flow = rates[s].low; }
