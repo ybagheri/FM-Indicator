@@ -267,6 +267,13 @@ Chart/alerts    Execution/risk   CSV/backtest
   no measured value yet (3–10 trades/arm); AUTO stays default for
   diversification logic only; re-validate at ≥30 trades/arm.
 
-## 20. Later (PLANNED)
+## 20. Phase 43 — Paper-Trading Readiness ✅ DONE (procedure ready)
 
-Phases 43–44 paper readiness + live-readiness review.
+- New `docs/PAPER_FORWARD.md` (attach procedure, 2-week acceptance, halt
+  drill). Evidence banked: BE modify 5× DONE (XAUUSD); trail OFF-by-default
+  (expected, unproven); halt/adopt/CloseAll code-complete, not live-fired.
+- Execution needs GUI chart-attach + calendar time → NOT EXECUTED here.
+
+## 21. Later (PLANNED)
+
+Phase 44 live-readiness review (final gate).
