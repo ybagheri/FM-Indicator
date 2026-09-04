@@ -73,7 +73,24 @@
 - Automation limits: failure extreme price is NOT in the signal (stop uses
   level+buffer proxy, not the excursion extreme); no follow-through required
   (by design — the reclaim IS the trigger).
-## PULLBACK — H1/H2/L1/L2 trend resumption (Phase 29, PLANNED)
-## BREAKOUT — FOLLOW/pending continuation (Phase 29, PLANNED)
+## PULLBACK — H1/H2/L1/L2 trend resumption (Phase 29 ✅)
+
+- What: with-trend entry after a 1–2-leg countertrend pullback; H2/L2
+  (second entry, firm, score 70) vs H1/L1 (first entry, provisional 40).
+- Detection: `CPullbackPatterns` EMA-gated H-count + `FromPullbackBull/Bear`
+  (tick-proxy entry, pullback-low stop, window-extreme objective).
+- EA rule: provisional trades ONLY when `InpTradeProvisional=true`
+  (default false — H1 alone is a documented risk, PULLBACK_PATTERNS §6).
+- Trail: allowed (continuation style); BE allowed; invalidation
+  `STOP_pullback_extreme`; chase + risk gates apply.
+
+## BREAKOUT — FOLLOW/pending continuation (Phase 29 ✅)
+
+- What: trade WITH a confirmed breakout (FOLLOW firm 70, trap penalty →50)
+  or position for one forming (PENDING provisional 40, FAILED silent).
+- Detection: `CBreakoutEngine` N-bar/swing refs + outcome lifecycle +
+  second-leg trap flag; `FromBreakout` geometry.
+- EA rule: same provisional gate; PENDING invalidation `STALE_or_ref_reclaim`.
+- Trail: allowed; BE allowed.
 ## REVERSAL_MTR — major/minor reversal (Phase 30, PLANNED)
 ## DOUBLE — swing/micro double top/bottom (Phase 30, PLANNED)

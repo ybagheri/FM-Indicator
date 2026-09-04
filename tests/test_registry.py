@@ -51,7 +51,12 @@ def test_tiebreaks():
     cands = [C("PULLBACK", 70, entry=2.0), C("PULLBACK", 70, entry=1.0)]
     ok, st, s = select(cands, MODE_AUTO, STRAT_FM_FADE, USES_ALL)
     check("tie_lower_entry", ok and s["entry"] == 1.0)
-    check("map_unknown_none", map_type("NOPE") == 0)
+def test_full_map():
+    expect = {"FM_FADE": 1, "PULLBACK": 2, "BREAKOUT": 3, "REVERSAL": 4,
+              "DOUBLE": 5, "FAILED_BO": 6}
+    for t, s in expect.items():
+        check("map_%s" % t, map_type(t) == s)
+    check("map_none", map_type("NOPE") == 0)
 
 
 def test_empty_no_trade():
@@ -73,5 +78,6 @@ if __name__ == "__main__":
     test_multi_filter()
     test_auto_max()
     test_tiebreaks()
+    test_full_map()
     test_empty_no_trade()
     print("ALL REGISTRY TESTS PASSED")

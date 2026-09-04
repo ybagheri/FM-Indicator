@@ -166,8 +166,54 @@ public:
       return true;
      }
 
-   // Phases 29 (pullback/breakout), 30 (reversal/double)
-   // builders arrive in their phase commits.
+   // Phase 29 — pullback (firm H2/L2 or provisional H1/L1 via flag).
+   bool              FromPullback(const GeneralSetup &s,
+                                  double price, double atr,
+                                  string &skipWhy, TradeIntent &in) const
+     {
+      ZeroMemory(in);
+      if(!s.valid || s.type != SETUP_TREND_PULLBACK)
+        {
+         skipWhy = "NOT_PULLBACK";
+         return false;
+        }
+      if(!GateProvisional(s.provisional, skipWhy))
+         return false;
+      if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
+         return false;
+      FillFromSetup(in, STRAT_PULLBACK, s);
+      in.invalidation = "STOP_pullback_extreme";
+      in.note = StringFormat("Pullback %s score=%d R=%.2f%s",
+                             (s.dir > 0 ? "BUY" : "SELL"), s.score, s.rMult,
+                             (s.provisional ? " H1-PROV" : " H2-FIRM"));
+      return true;
+     }
+
+   // Phase 29b — breakout FOLLOW (firm) / PENDING (provisional).
+   bool              FromBreakout(const GeneralSetup &s,
+                                  double price, double atr,
+                                  string &skipWhy, TradeIntent &in) const
+     {
+      ZeroMemory(in);
+      if(!s.valid || s.type != SETUP_BREAKOUT)
+        {
+         skipWhy = "NOT_BREAKOUT";
+         return false;
+        }
+      if(!GateProvisional(s.provisional, skipWhy))
+         return false;
+      if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
+         return false;
+      FillFromSetup(in, STRAT_BREAKOUT, s);
+      in.invalidation = (s.provisional ? "STALE_or_ref_reclaim"
+                                       : "STOP_breakout_ref");
+      in.note = StringFormat("Breakout %s score=%d R=%.2f%s",
+                             (s.dir > 0 ? "BUY" : "SELL"), s.score, s.rMult,
+                             (s.provisional ? " PENDING-PROV" : " FOLLOW-FIRM"));
+      return true;
+     }
+
+   // Phase 30 (reversal/double) builders arrive in their phase commit.
   };
 
 #endif
