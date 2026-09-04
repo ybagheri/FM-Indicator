@@ -92,5 +92,26 @@
   second-leg trap flag; `FromBreakout` geometry.
 - EA rule: same provisional gate; PENDING invalidation `STALE_or_ref_reclaim`.
 - Trail: allowed; BE allowed.
-## REVERSAL_MTR — major/minor reversal (Phase 30, PLANNED)
-## DOUBLE — swing/micro double top/bottom (Phase 30, PLANNED)
+## REVERSAL_MTR — major/minor reversal (Phase 30 ✅)
+
+- What: reversal after EMA-cross + retest + (MAJOR) Phase-4 FOLLOW +
+  pressure; MINOR = EMA + retest only (provisional 40), MAJOR firm 80.
+- Detection: `CMajorReversal::Analyze` + `FromReversal` (EMA-anchored stop,
+  2ATR objective convention).
+- EA rule: provisional gate; BE allowed, trail OFF (fixed objective);
+  invalidation `STOP_mtr_anchor`.
+- False positives: MINOR in strong trends (provisional gate + trend context
+  in Phase 31 AUTO); EMA-cross chop (retest requirement filters).
+- Automation limits: EMA-cross is a trend-break proxy, not a trendline break;
+  discretionary "failed final flag" reading not observable.
+
+## DOUBLE — swing/micro double top/bottom (Phase 30 ✅)
+
+- What: two tests of a level with trough separation; swing (firm 60,
+  level+tol stop, trough objective) vs micro (provisional 30).
+- Detection: `FindDoubleTop/Bottom` (confirmed swings, most-recent wins) +
+  `MicroDoubleTop/Bottom` (raw extremes, halved trough) + `FromDouble`.
+- EA rule: provisional gate; BE allowed, trail OFF; invalidation
+  `STOP_double_level`.
+- False positives: micro chop doubles (provisional gate); tolerance
+  sensitivity documented in PULLBACK_PATTERNS (tol 0.25ATR, trough 0.5ATR).

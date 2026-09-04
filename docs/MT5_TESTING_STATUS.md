@@ -128,6 +128,23 @@ Runtime errors:  0
 Trades:          0 (no order code yet) → trading metrics N/A
 ```
 
+## Run T-010 — MT5 BACKTEST (EA, all six intents) ✅ PASS
+
+```text
+Git commit:      Phase-30 HEAD (all From* builders + dispatch)
+EA version:      FM_EA 1.00, defaults (AUTO, provisional OFF)
+Symbol/TF/Dates/Model/Balance: same H1 window
+Result:          Test passed (124811 ticks, 528 bars)
+Census:          bars=528 riskOK=481; FM_FADE=1 PULLBACK=293 BREAKOUT=14
+                 REVERSAL_MTR=0 DOUBLE=220 FAILED_BO=0
+Intents:         WOULD_BUY/SELL x125 (Double 111, Breakout 14),
+                 SKIP_LATE_ENTRY x356, LOW_RR x47 (=528-481)
+Runtime errors:  0
+Trades:          0 (no order code yet) → trading metrics N/A
+Note:            pullback 293/293 late is stale-level skips (spot-verified),
+                 not a gate bug; chase calibration deferred to Phase 34.
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers

@@ -213,7 +213,51 @@ public:
       return true;
      }
 
-   // Phase 30 (reversal/double) builders arrive in their phase commit.
+   // Phase 30 — reversal MTR (MAJOR firm / MINOR provisional) + doubles
+   // (swing firm / micro provisional). Both ride the catalog setup.
+   bool              FromReversal(const GeneralSetup &s,
+                                  double price, double atr,
+                                  string &skipWhy, TradeIntent &in) const
+     {
+      ZeroMemory(in);
+      if(!s.valid || s.type != SETUP_REVERSAL)
+        {
+         skipWhy = "NOT_REVERSAL";
+         return false;
+        }
+      if(!GateProvisional(s.provisional, skipWhy))
+         return false;
+      if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
+         return false;
+      FillFromSetup(in, STRAT_REVERSAL, s);
+      in.invalidation = "STOP_mtr_anchor";
+      in.note = StringFormat("MTR %s score=%d R=%.2f%s",
+                             (s.dir > 0 ? "BUY" : "SELL"), s.score, s.rMult,
+                             (s.provisional ? " MINOR-PROV" : " MAJOR-FIRM"));
+      return true;
+     }
+
+   bool              FromDouble(const GeneralSetup &s,
+                                double price, double atr,
+                                string &skipWhy, TradeIntent &in) const
+     {
+      ZeroMemory(in);
+      if(!s.valid || s.type != SETUP_DOUBLE)
+        {
+         skipWhy = "NOT_DOUBLE";
+         return false;
+        }
+      if(!GateProvisional(s.provisional, skipWhy))
+         return false;
+      if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
+         return false;
+      FillFromSetup(in, STRAT_DOUBLE, s);
+      in.invalidation = "STOP_double_level";
+      in.note = StringFormat("Double %s score=%d R=%.2f%s",
+                             (s.dir > 0 ? "BUY" : "SELL"), s.score, s.rMult,
+                             (s.provisional ? " MICRO-PROV" : " SWING-FIRM"));
+      return true;
+     }
   };
 
 #endif

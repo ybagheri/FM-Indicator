@@ -172,7 +172,7 @@ void OnTick()
       RiskDecision rd = g_risk.Check(_Symbol, sel.setup, spread, ymd);
       if(rd.allowed)
          g_riskOK++;
-      // Phases 27–29: FM + failed-BO + pullback + breakout intents (30 adds rest).
+      // Phase 27–30: all strategy intents (entries still need Phase 33).
       string intentTxt = "INTENT_PENDING_PHASE";
       if(rd.allowed && sel.strategy != STRAT_NONE)
         {
@@ -189,6 +189,10 @@ void OnTick()
             made = g_intent.FromPullback(sel.setup, px, res.atr, why, ti);
          else if(sel.strategy == STRAT_BREAKOUT)
             made = g_intent.FromBreakout(sel.setup, px, res.atr, why, ti);
+         else if(sel.strategy == STRAT_REVERSAL)
+            made = g_intent.FromReversal(sel.setup, px, res.atr, why, ti);
+         else if(sel.strategy == STRAT_DOUBLE)
+            made = g_intent.FromDouble(sel.setup, px, res.atr, why, ti);
          if(made)
             intentTxt = StringFormat("WOULD_%s %s",
                                      (ti.dir > 0 ? "BUY" : "SELL"), ti.note);

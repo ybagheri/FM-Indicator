@@ -135,9 +135,26 @@ Chart/alerts    Execution/risk   CSV/backtest
   correctly held (LOW_RR), 0 errors. T-009b (minRR 0.5): `WOULD_BUY FM fade
   BUY score=62 R=0.63 risk=OK vol=0.44` — FromFM proven live.
 
-## 9. Later (PLANNED)
+## 9. Phases 28–30 — Strategy Intents ✅ DONE (3 commits)
 
-Phase 28 failed-BO; 29 pullback/breakout; 30 reversal/double;
+- Phase 28: `SETUP_FAILED_BO`/`STRAT_FAILED_BO` (registry `BuildFailedBO`,
+  proxy geometry entry=level/stop=level+buf/obj=2ATR/score 55) + `FromFailedBO`
+  + EA candidate append + dispatch + catalog section.
+- Phase 29: `FromPullback`/`FromBreakout` (firm/provisional semantics) + EA
+  dispatch + catalog sections + full type-map tests.
+- Phase 30: `FromReversal`/`FromDouble` + dispatch completion + catalog.
+- MT5 BACKTEST T-010 (H1 defaults): pass, census 528/481 +
+  FAILED_BO=0 (no failed-BO outcome in window — path exists, unexercised).
+  Intent distribution over 528 bars: WOULD_ ×125 (Double 111, Breakout 14),
+  SKIP_LATE_ENTRY ×356, LOW_RR ×47. Observation (not a defect): pullback
+  selections went 293/293 late — spot-checked stale levels left behind by
+  the market (entry 1.16059, market already toward obj 1.15211); chase
+  calibration (0.5×ATR, 5-bar hold) is Phase-34 tuning material.
+- 0 errors throughout.
+
+## 10. Later (PLANNED)
+
+Phase 31 AUTO + conflict resolution; 32 explanation; 33 safety + modes;
 31 AUTO + conflict resolution; 32 explanation; 33 safety + modes; 31 AUTO + conflict resolution; 32 explanation;
 33 safety + modes; 34+ baselines/optimization/OOS/walk-forward per strategy.
 Each phase: implement → compile → unit tests → MT5 test → inspect →
