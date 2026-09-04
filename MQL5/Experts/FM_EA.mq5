@@ -67,6 +67,8 @@ input double             InpAutoRRLevel    = 2.0;
 //--- trading modes + safety (Phase 33; default = safest)
 input ENUM_FM_TRADE_MODE InpTradeMode      = TRADE_ANALYSIS_ONLY;
 input string             InpLiveToken      = "";    // must equal TRADE_LIVE for live
+//--- EXP-0002 apparatus (measurement only; default true = production logic)
+input bool               InpApplyStructuralVeto = true;
 input bool               InpEmergencyStop  = false;
 input double             InpMaxDrawdownPct = 20.0;  // %, 0=off
 input int                InpSessionStartH  = 0;     // server hour, start==end = always
@@ -89,6 +91,7 @@ long              g_bars = 0;
 long              g_selCount[STRAT_COUNT];
 long              g_riskOK = 0;
 long              g_veto = 0;
+long              g_vetoByReason[11];   // EXP-0002: indexed by ENUM_DECISION_REASON
 
 int OnInit()
   {
@@ -120,6 +123,7 @@ int OnInit()
    if(nAdopt > 0)
       PrintFormat("[FM_EA] adopted %d open position(s) on init", nAdopt);
    ArrayInitialize(g_selCount, 0);
+   ArrayInitialize(g_vetoByReason, 0);
    PrintFormat("[FM_EA] init OK mode=%s magic=%d history=%d (ANALYSIS_ONLY, no orders)",
                CStrategyRegistry::ModeName(InpStratMode), InpMagic, InpHistoryBars);
    return(INIT_SUCCEEDED);
@@ -131,6 +135,11 @@ void OnDeinit(const int reason)
    for(int i = 1; i < STRAT_COUNT; i++)
       s += StringFormat(" %s=%d", CStrategyRegistry::StrategyName((ENUM_FM_STRATEGY)i), g_selCount[i]);
    PrintFormat("[FM_EA] done bars=%d riskOK=%d veto=%d selections:%s reason=%d", g_bars, g_riskOK, g_veto, s, reason);
+   string vr = "";
+   for(int vi = 0; vi < 11; vi++)
+      if(g_vetoByReason[vi] > 0)
+         vr += StringFormat(" %s=%d", CDecisionEngine::ReasonName((ENUM_DECISION_REASON)vi), g_vetoByReason[vi]);
+   PrintFormat("[FM_EA] vetoByReason:%s", vr);
    PaperStats ps;
    g_paper.Stats(ps);
    PrintFormat("[FM_EA] %s", g_paper.Summary());
@@ -288,24 +297,46 @@ void OnTick()
    else
       sel = g_registry.Select(cand);
    // Phase 31: Phase-8 structural vetoes apply in ALL modes.
+   // EXP-0002 apparatus: InpApplyStructuralVeto=false counts vetoes but
+   // proceeds (vetoWhy retained for alternate tagging + bypass log).
    string vetoWhy = "";
+   ENUM_DECISION_REASON vetoDr = REASON_OK;
    if(sel.hasTrade && res.decisionDone)
      {
       ENUM_DECISION_REASON dr = res.decision.reason;
       if(dr == REASON_BARBWIRE || dr == REASON_MID_RANGE ||
          dr == REASON_CONFLICT || dr == REASON_NO_EDGE ||
          dr == REASON_TRAP_REPEAT)
+        {
          vetoWhy = "DECISION_VETO_" + CDecisionEngine::ReasonName(dr);
+         vetoDr = dr;
+        }
      }
+   bool vetoBypassed = false;
    if(sel.hasTrade && vetoWhy != "")
      {
       g_veto++;
-      if(g_veto % 25 == 1)
-         PrintFormat("[FM_EA] %s %s veto=%s",
-                     TimeToString(res.barTime),
-                     CStrategyRegistry::StrategyName(sel.strategy), vetoWhy);
+      if((int)vetoDr >= 0 && (int)vetoDr < 11)
+         g_vetoByReason[(int)vetoDr]++;
+      if(!InpApplyStructuralVeto)
+        {
+         vetoBypassed = true;
+         if(g_veto % 25 == 1)
+            PrintFormat("[FM_EA] %s %s VETO_BYPASSED_%s",
+                        TimeToString(res.barTime),
+                        CStrategyRegistry::StrategyName(sel.strategy), vetoWhy);
+        }
+      else
+        {
+         if(g_veto % 25 == 1)
+            PrintFormat("[FM_EA] %s %s veto=%s",
+                        TimeToString(res.barTime),
+                        CStrategyRegistry::StrategyName(sel.strategy), vetoWhy);
+        }
      }
-   else if(sel.hasTrade)
+   // Production: skip on veto. EXP-0002 treatment: veto counted above,
+   // bypass logged, selection proceeds (vetoWhy retained for tagging).
+   if(sel.hasTrade && (vetoWhy == "" || vetoBypassed))
      {
       g_selCount[sel.strategy]++;
       MqlDateTime dt;
@@ -377,7 +408,7 @@ void OnTick()
          else
             intentTxt = "SKIP_" + why;
         }
-      PrintFormat("[FM_EA] %s %s %s entry=%s stop=%s obj=%s score=%d%s R=%.2f cands=%d final=%d risk=%s vol=%.2f %s",
+      PrintFormat("[FM_EA] %s %s %s entry=%s stop=%s obj=%s score=%d%s R=%.2f cands=%d final=%d sig=%d risk=%s vol=%.2f %s",
                   TimeToString(res.barTime),
                   (sel.setup.dir > 0 ? "BUY" : "SELL"),
                   CStrategyRegistry::StrategyName(sel.strategy),
@@ -386,7 +417,7 @@ void OnTick()
                   DoubleToString(sel.setup.objective, _Digits),
                   sel.setup.score,
                   (sel.setup.provisional ? " PROV" : ""),
-                  sel.setup.rMult, n, autoFinal, rd.reason, rd.volume, intentTxt);
+                  sel.setup.rMult, n, autoFinal, sel.setup.signalBar, rd.reason, rd.volume, intentTxt);
      }
    else if(g_bars % 500 == 0)
       PrintFormat("[FM_EA] %s NO_TRADE cands=%d (mode=%s)",
