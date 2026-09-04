@@ -186,8 +186,11 @@ cd FM-indicator && python3 -m pytest tests/ -q
 
 ## Known limits
 
-No tick-level MT5 tester run in this env; no statistical/PTR walk-forward yet;
+No statistical/PTR walk-forward yet;
 inverse-MM anchoring (v1.1 symmetric far-side anchor) unvalidated on real data —
 run `FM-Families.set` + CSV export in Strategy Tester visual mode, then review
-MAE/MFE per family before any live use. Ordered next steps (owner + acceptance
+MAE/MFE per family before any live use. Smoke-tested 2026-09-04 (Alpari MT5
+build 6090, temp `FM_SmokeTest` EA via iCustom): EURUSD H1 Nov–Dec 2025
+528/528 reads (91 POT / 11 DEV / 5 CONF) + EURUSD M1 11.10–11.13
+4260/4260 reads (912/177/43), 0 errors — see `VALIDATION.md`. Ordered next steps (owner + acceptance
 per item): `FUTURE_ROADMAP.md` § "Next moves (ordered)".

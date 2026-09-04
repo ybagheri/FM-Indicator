@@ -15,6 +15,15 @@
 - Static delimiter scan (comment/string-stripped balanced braces/parens)
   over all MQL5 files as Linux-CI stand-in for MetaEditor.
 - No-look-ahead / freeze suites per layer (see `NON_REPAINTING.md`).
+- Strategy Tester smoke runs (Alpari MT5 build 6090, 2026-09-04, temp EA
+  `FM_SmokeTest` via iCustom defaults — EA lives in the terminal only, never
+  committed here):
+  - EURUSD H1 2025.11.03–2025.12.03 (Model=1): 528/528 bars read,
+    target 528 / POTENTIAL 91 / DEVELOPING 11 / CONFIRMED 5, 0 errors.
+  - EURUSD M1 2025.11.10–2025.11.13 (Model=1): 4260/4260 bars read,
+    target 4138 / POTENTIAL 912 / DEVELOPING 177 / CONFIRMED 43, 0 errors.
+  This proves no runtime errors + EA-readable buffers; it does NOT replace
+  the visual run (§2.1) or walk-forward (§2.2).
 
 ## 2. NOT done (do not skip)
 
