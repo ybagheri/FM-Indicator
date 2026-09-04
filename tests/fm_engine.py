@@ -421,6 +421,21 @@ def mtf_bias(htf_closes):
     return 0
 
 
+def ltf_bias(ltf_closes):
+    """Read-only lower-TF bias — identical SMA20/50 gap math as mtf_bias
+    (mirrors MQL5 LTFBias via the shared TFBias helper). Returns +1/-1/0."""
+    return mtf_bias(ltf_closes)
+
+
+def ltf_confirm(bias, setup_dir):
+    """Read-only LTF confirmation of a setup direction (mirrors the MQL5
+    hook: AGREE/DISAGREE/NEUTRAL of LTF bias vs Phase-8 decision dir).
+    Never affects detection."""
+    if bias not in (+1, -1) or setup_dir not in (+1, -1):
+        return "NEUTRAL"
+    return "AGREE" if bias == setup_dir else "DISAGREE"
+
+
 def mae_mfe(bars, entry_idx, entry_px, fade_dir, horizon=20):
     """Max adverse / favorable excursion (in price) after entry bar.
     fade_dir: trade direction (opposite the MM). No profit claims — pure

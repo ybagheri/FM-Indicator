@@ -55,6 +55,7 @@ Conventions:
 | `InpStrongClosePct` | double | 0.70 | Phase 1: close in extreme N% → strong close |
 | `InpEnableBarAnalysis` | bool | true | Phase 1: bar analyzer master switch (read-only) |
 | `InpMTFTrendTFMinutes` | int | 0 | v2: higher-TF overlay minutes, 0=off (LOG_ONLY) |
+| `InpLTFMinutes` | int | 0 | v2: lower-TF confirm minutes, 0=off (LOG_ONLY) |
 | `InpExportCSV` | bool | false | v2: append CSV row per CONFIRMED |
 | `InpCSVFile` | string | FM_signals.csv | v2: CSV filename under MQL5/Files |
 | `InpContextFilterMode` | enum | LOG_ONLY | `LOG_ONLY` / `DEMOTE` / `VETO` (see §7) |
@@ -333,6 +334,9 @@ MQL5 engine must match it on identical synthetic series (see TESTING.md).
 - **MTF overlay** (`InpMTFTrendTFMinutes`, 0=off): 20/50 SMA gap on higher-TF
   closes, ATR-normalized; `>0.8 → +1`, `<−0.8 → −1`, else 0. Logged at INFO;
   default context mode LOG_ONLY is unchanged.
+- **LTF confirm** (`InpLTFMinutes`, 0=off): same SMA-gap math via the shared
+  `TFBias()` helper on lower-TF closes; hook reports AGREE/DISAGREE/NEUTRAL
+  vs the Phase-8 decision direction at INFO. Read-only, never gates.
 - **CSV export** (`InpExportCSV`/`InpCSVFile`): one row per CONFIRMED edge on
   the just-closed bar: `time,id,family,dir,target,price,score,symbol,tf`.
 - **MAE/MFE** (Python `mae_mfe`, horizon 20): max adverse/favorable excursion

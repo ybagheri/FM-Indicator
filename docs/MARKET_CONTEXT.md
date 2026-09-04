@@ -22,7 +22,7 @@ plumbing (TESTING #17).
 - No gating changes: context still never vetoes in LOG_ONLY (Brooks "context,
   not trigger" preserved).
 
-## 3. Planned market-state engine (Phases 3–4, NOT implemented yet)
+## 3. Market-state engine (built in Phase 3 — plan retained below)
 
 States: UNKNOWN, BULL_TREND, BEAR_TREND, BULL_CHANNEL, BEAR_CHANNEL,
 TRADING_RANGE, BREAKOUT_MODE, BULL_BREAKOUT, BEAR_BREAKOUT,
@@ -49,10 +49,12 @@ late entry (>0.5×ATR past signal extreme); ≥2 failed breakouts in last 20 bar
 without follow-through. Reasons are enum values, not free text, so tests can
 assert them.
 
-## 5. MTF architecture (reserved, not built in Phase 1)
+## 5. MTF architecture (HTF built in v2; LTF confirm built post-Phase-8)
 
-HTF bias = current `MTFBias()` (SMA20/50 gap, LOG_ONLY). LTF entry confirmation
-reserved: `InpLTFMinutes` input + `LTFConfirm()` stub documented but NOT
-implemented — architecture holds the slot so later work doesn't refactor call
-sites. Current-TF setup detection is authoritative; HTF/LTF never gate in
-LOG_ONLY mode.
+HTF bias = `MTFBias()` (SMA20/50 gap, LOG_ONLY). LTF entry confirmation =
+`InpLTFMinutes` input (0=off, else lower-TF minutes) + `LTFBias()` (same
+SMA20/50 gap math via the shared `TFBias()` helper — one formula source)
++ hook-side `AGREE`/`DISAGREE`/`NEUTRAL` of the LTF bias vs the Phase-8
+decision direction, INFO-logged when enabled. Current-TF setup detection is
+authoritative; HTF/LTF never gate (LOG_ONLY mode). Mirror: `ltf_bias` +
+`ltf_confirm` in `tests/fm_engine.py`; suites in `tests/test_ltf.py` (3).

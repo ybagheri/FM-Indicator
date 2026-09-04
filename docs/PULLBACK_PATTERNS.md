@@ -86,12 +86,15 @@ bars, same `tol`, trough requirement halved (`×0.5`) for the short window.
 Output identical struct with `micro:true`. Micro doubles are lower-confidence
 by construction (documented; Phase 8 scores them below swing doubles).
 
-## 6. MTR note (NOT implemented — honesty record)
+## 6. MTR note (built in Phase 5 — honesty record retained)
 
 A full Major Trend Reversal needs trend-line break + failed retest + second
 entry with strong BO (HARD automation: discretionary line placement). Phase 2
-deliberately ships only the components (TrendDir, second-leg counting,
-doubles) and does NOT emit "MTR" labels. MTR proxy is Phase 5 work.
+deliberately shipped only the components (TrendDir, second-leg counting,
+doubles) and did NOT emit "MTR" labels. The MTR proxy (EMA-cross for the
+line break + retest + Phase-4 FOLLOW + pressure → MINOR/MAJOR, unit weights)
+was built in Phase 5 — see `REVERSAL_ENGINE.md` §4. This layer's contract is
+unchanged: it emits components, never verdicts.
 
 ## 7. No-look-ahead / repaint contract (extends SPEC §9, bar spec §6)
 

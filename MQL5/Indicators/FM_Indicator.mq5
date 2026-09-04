@@ -109,6 +109,7 @@ input double InpMaxLateEntryATRMult = 0.50;  // Phase 8: chase veto past entry (
 input int    InpDecisionConflictPpts= 10;    // Phase 8: top-two state pct gap = conflict
 input int    InpDecisionMaxFailedBO = 2;     // Phase 8: failed-BO trap-repeat threshold
 input int    InpMTFTrendTFMinutes   = 0;      // v2 MTF overlay: 0=off, else higher-TF minutes
+input int    InpLTFMinutes            = 0;      // v2 LTF confirm: 0=off, else lower-TF minutes (LOG_ONLY)
 input bool   InpExportCSV           = false;  // v2: write signals CSV on new CONFIRMED
 input string InpCSVFile             = "FM_signals.csv";
 input ENUM_CTX_FILTER InpContextFilterMode = CTX_LOG_ONLY;
@@ -247,15 +248,16 @@ void OnDeinit(const int reason)
    g_viz.DeleteAll();
   }
 
-// v2 MTF overlay (read-only): higher-TF bias from 20/50 SMA on closed bars.
+// v2 MTF/LTF overlays (read-only): SMA20/50-gap bias on another timeframe.
 // Returns +1/-1/0; never affects the state machine (SPEC §7 LOG_ONLY).
-int MTFBias()
+// Shared helper (single formula source); MTFBias/LTFBias differ only by input.
+int TFBias(int tfMinutes)
   {
-   if(InpMTFTrendTFMinutes <= 0) return 0;
-   ENUM_TIMEFRAMES htf = (ENUM_TIMEFRAMES)InpMTFTrendTFMinutes;
+   if(tfMinutes <= 0) return 0;
+   ENUM_TIMEFRAMES tf = (ENUM_TIMEFRAMES)tfMinutes;
    double c[];
    int need = 60;
-   if(CopyClose(_Symbol, htf, 1, need, c) < need) return 0;
+   if(CopyClose(_Symbol, tf, 1, need, c) < need) return 0;
    double s20 = 0, s50 = 0;
    for(int i = 0; i < 20; i++) s20 += c[i];
    for(int i = 0; i < 50; i++) s50 += c[i];
@@ -267,6 +269,9 @@ int MTFBias()
    if(gap < -0.8) return -1;
    return 0;
   }
+
+int MTFBias() { return TFBias(InpMTFTrendTFMinutes); }
+int LTFBias() { return TFBias(InpLTFMinutes); }
 
 // v2 research export: append one CSV row per CONFIRMED (closed-bar only).
 void ExportSignalRow(datetime bt, const CFMSetup &s, double px, int score)
@@ -578,6 +583,15 @@ int OnCalculate(const int rates_total,
           ObjectSetInteger(0,"FM_DECISION",OBJPROP_FONTSIZE,9);
           ObjectSetInteger(0,"FM_DECISION",OBJPROP_ANCHOR,ANCHOR_RIGHT);
           ObjectMove(0,"FM_DECISION",0,time[1],close[1]);
+          // v2 LTF entry confirmation (read-only; never gates the state machine).
+          if(InpLTFMinutes>0)
+            {
+             int ltfB=LTFBias();
+             string lc=((ltfB==0||dec.dir==0)?"NEUTRAL":((ltfB==dec.dir)?"AGREE":"DISAGREE"));
+             g_log.Info(StringFormat("LTF confirm=%s (LTF %d min bias=%d vs %s %s, LOG_ONLY)",
+                lc,InpLTFMinutes,ltfB,CGeneralSetups::TypeName(dec.setupType),
+                CDecisionEngine::ActionName(dec.action)));
+            }
          }
       // v2 MTF overlay (read-only annotation; never gates the state machine).
       if(InpMTFTrendTFMinutes > 0)

@@ -53,8 +53,11 @@ enum ENUM_FM_PRICE_MODE
    FM_PRICE_CLOSE=1    // line-chart mode: swings/legs/targets/distances on Close
   };
 
-// Phase 3 market-state engine (docs/MARKET_STATE.md §7). BO / pullback-in-
-// trend / reversal members reserved for Phases 4-5 (not added now).
+// Phase 3 market-state engine (docs/MARKET_STATE.md §7). BO / pullback /
+// reversal lifecycle states live in dedicated engines by design:
+// ENUM_BO_OUTCOME (Phase 4), ENUM_REV_VERDICT (Phase 5), ENUM_SETUP_TYPE
+// (Phase 7, GeneralSetups.mqh), ENUM_DECISION_ACTION/REASON (Phase 8,
+// DecisionEngine.mqh) — not as members here.
 enum ENUM_MARKET_STATE
   {
    MS_UNKNOWN=0,

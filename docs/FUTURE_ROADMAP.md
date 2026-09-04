@@ -26,6 +26,9 @@
 ## v2 (research tooling) — DONE (tooling; analysis pending)
 - [x] Historical signal export (CSV) + `backtest_run` + MAE/MFE harness.
 - [x] Multi-timeframe read-only overlay (`InpMTFTrendTFMinutes`, LOG_ONLY).
+- [x] Lower-TF entry confirmation (`InpLTFMinutes` + `LTFBias` via shared
+  `TFBias` helper + AGREE/DISAGREE/NEUTRAL vs Phase-8 direction, LOG_ONLY) +
+  mirror (`ltf_bias`/`ltf_confirm`) + 3 tests.
 - [x] EA foundation: `CFMEngine::ActiveSnapshots()` + DATA buffers.
 - [ ] Parameter sensitivity / Monte Carlo notes from exported data.
 
@@ -54,7 +57,9 @@
   (`DECISION_ENGINE.md` + `DecisionEngine.mqh` + mirror + 10 tests,
   read-only hook; never gates FM, never trades).
 
-Bar-by-bar expansion Phases 1–8 COMPLETE (94 Python tests, all pass).
+Bar-by-bar expansion Phases 1–8 COMPLETE (97 Python tests, all pass).
+Stale-doc audit post-Phase-8: RESEARCH row 4, PULLBACK §6, MARKET_CONTEXT §3,
+MARKET_STATE §7, CONCEPTS H1/H2 corrected to built-status (records retained).
 Remaining: MetaEditor compile + Strategy Tester visual run (user-side);
 walk-forward/parameter review from exported CSV data; v3 EA in a separate
 repo (this indicator repo stays execution-free).

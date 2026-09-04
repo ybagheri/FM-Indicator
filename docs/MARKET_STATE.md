@@ -110,7 +110,11 @@ every token has a predicate in §3–5.
 
 `MS_UNKNOWN=0, MS_BULL_TREND, MS_BEAR_TREND, MS_BULL_CHANNEL,
 MS_BEAR_CHANNEL, MS_TRADING_RANGE, MS_BREAKOUT_MODE, MS_TRANSITION`.
-BO/pullback/reversal members reserved for Phases 4–5 (not added now).
+BO/pullback/reversal lifecycle states were NOT added here — by design they
+live in dedicated engines: `ENUM_BO_OUTCOME` (Phase 4), `ENUM_REV_VERDICT`
+(Phase 5), `ENUM_SETUP_TYPE` (Phase 7), `ENUM_DECISION_ACTION/REASON`
+(Phase 8). The "reserved" note from the Phase-3 draft is superseded; kept
+as the decision record.
 
 ## 8. No-look-ahead / repaint contract (extends SPEC §9, bar §6, pullback §7)
 

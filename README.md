@@ -69,7 +69,8 @@ low-score / low-RR / late / trap-repeat), DEBUG-logged + single
 line-chart MM analysis). Families v1.2 (default OFF): `InpEnableRangeMM` /
 `RangeLookback=50`, `InpEnableChannelMM` (depth 0.02–0.15 only),
 `InpEnableGapMM` / `MinGapATRMult=1.0`. v2 research: `InpMTFTrendTFMinutes`
-(read-only bias, 0=off), `InpExportCSV`/`InpCSVFile`. Presets:
+(read-only bias, 0=off), `InpLTFMinutes` (read-only LTF confirm, 0=off),
+`InpExportCSV`/`InpCSVFile`. Presets:
 **Conservative**, **Balanced**, **Aggressive**, **M1-Scalp**, **Line-Chart**,
 **Families** (all MM families ON). Full table in SPEC §1.
 

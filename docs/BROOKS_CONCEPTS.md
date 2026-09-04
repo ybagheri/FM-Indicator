@@ -125,9 +125,12 @@ Brooks: H1 = first bull break above a pullback bar high in a bull trend
 low = primary entry. Mirror L1/L2 in bear trends. Reliable ONLY in trends;
 in ranges every H1/H2 fails.
 Observable: pullback swing lows + breaks of their highs (needs swing + trend).
-Systematic (planned): H1/H2 counter in pullback analyzer gated on
-`context==TREND` with matching direction; range context suppresses to WAIT.
-Implementation: Phase 5 (pullback analyzer). Automation: MEDIUM.
+Systematic: H1/H2 counter in the pullback analyzer gated on the EMA-gap
+trend gate (`TrendDir` ±1 with matching direction); gate 0 suppresses rather
+than misleads, and range context suppresses via the Phase-8 WAIT rules.
+Implementation: Phase 2 (`PullbackPatterns.mqh` + mirror; "Phase 5" in the
+draft was the early numbering — superseded, kept as the decision record).
+Automation: MEDIUM.
 Risks: requires trend classification first — wrong context = false H2s.
 
 ## 3. Trend / range / transition

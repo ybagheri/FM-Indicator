@@ -12,9 +12,11 @@
 - Setup oracle: `tests/setup_engine.py` (1:1 mirror of SETUP_ENGINE.md).
 - General oracle: `tests/general_setups.py` (1:1 mirror of GENERAL_SETUPS.md).
 - Decision oracle: `tests/decision.py` (1:1 mirror of DECISION_ENGINE.md).
-- Run: `python3 -m pytest tests/ -q` → 94 tests, ALL PASS (19 FM + 7 bar +
+- LTF oracle: `ltf_bias` + `ltf_confirm` in `tests/fm_engine.py` (mirror of
+  MARKET_CONTEXT.md §5; same SMA-gap math as `mtf_bias` via shared helper).
+- Run: `python3 -m pytest tests/ -q` → 97 tests, ALL PASS (19 FM + 7 bar +
   10 pullback + 9 state + 9 breakout + 10 reversal + 10 setup + 10 general +
-  10 decision; or per-file via `__main__`).
+  10 decision + 3 LTF; or per-file via `__main__`).
 - MQL5 compile: MetaEditor on Windows (F7). Linux env has no
   `metaeditor.exe`/`wine`; static check = balanced-delimiter scan
   (comment/string-stripped) over all 21 MQL5 files → OK.
@@ -110,6 +112,9 @@
 | 85 | Priority order | barbwire > mid-range > conflict > score | PASS |
 | 86 | Zero-ATR late guard | no crash, no false late | PASS |
 | 87 | Decision determinism + freeze | identical re-call; pure inputs | PASS |
+| 88 | LTF bias geometry | up +1 / down −1 / short-history + flat 0; matches HTF math | PASS |
+| 89 | LTF confirm states | AGREE / DISAGREE / NEUTRAL (zero bias/dir) | PASS |
+| 90 | LTF determinism | pure re-call identical | PASS |
 
 ## Coverage map (prompt §TESTING 1–12 + v1.2/v2)
 
@@ -169,6 +174,9 @@ conflict veto (UNKNOWN-guard, TRANSITION→NO_EDGE ordering); low-score
 (boundary 40 earns) + low-RR waits; late chase veto both sides; trap-repeat
 veto + follow rescue + sub-threshold pass; priority order; zero-ATR safety;
 determinism + freeze (pure inputs).
+LTF confirmation (`test_ltf.py`, 3 suites): bias geometry (up/down/flat/
+short-history; parity with `mtf_bias`); confirm AGREE/DISAGREE/NEUTRAL;
+purity + determinism.
 
 ## Reproduce
 
