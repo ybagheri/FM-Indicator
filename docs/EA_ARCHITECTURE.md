@@ -225,6 +225,16 @@ Chart/alerts    Execution/risk   CSV/backtest
   flips cell economics (capped −37.44 vs uncapped +541.16) — needs OOS study.
 - 9 MT5 runs, 0 errors. Methodology (grid + plateau rule) proven.
 
-## 16. Later (PLANNED)
+## 16. Phases 37–39 — Forward / OOS / Walk-Forward ✅ DONE (3 commits)
 
-Phases 37–42 OOS/forward/walk-forward/multi-symbol/regime/AUTO validation;
+- `docs/VALIDATION_METHODOLOGY.md` (IS/OOS/forward definitions, no-relabel
+  rule, WF protocol). T-018 IS: 1 trade −99.00 PF 0.00. T-019 OOS: 5 trades
+  2/5 +487.82 PF 2.26. Verdict: negative degradation but noise-sized;
+  no overfit (nothing tuned), no edge demonstrated; OOS unchanged by results.
+- WF demo with defaults (W1→F1 above): protocol ready, data too thin to
+  promote anything. Reports `T-018*`, `T-019*` committed.
+- Process lesson recorded: `[Tester]` keys must precede `[TesterInputs]`.
+
+## 17. Later (PLANNED)
+
+Phases 40–42 multi-symbol/regime/AUTO validation; 43–44 paper/live review.

@@ -212,6 +212,19 @@ Result:          Test passed; OnTester result -0.15118625; census identical
 Runtime errors:  0
 ```
 
+## Runs T-018/19 — MT5 BACKTEST (IS/OOS split, AUTO DEMO) ✅ PASS
+
+```text
+Common: FM_EA 1.00, EURUSD H1, Model 1, $10k, defaults, DEMO
+T-018 IS  11.03–11.17 (240 bars): 1 trade, 0/1, -99.00, PF 0.00, veto 207
+T-019 OOS 11.18–12.03 (264 bars): 5 trades, 2/5, +487.82, PF 2.26,
+                                   exp +97.56, veto 205
+Runtime errors: 0. Reports: reports/T-018*, T-019*.
+Lesson: ini [Tester] keys MUST precede [TesterInputs] (first attempt put
+dates in the wrong section and silently ran the full window — caught by
+checking the agent "testing of ... from" line).
+```
+
 ## What the runs prove / do NOT prove
 
 - Prove: indicator loads in tester, calculates every bar on H1+M1, buffers
