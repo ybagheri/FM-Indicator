@@ -189,4 +189,5 @@ cd FM-indicator && python3 -m pytest tests/ -q
 No tick-level MT5 tester run in this env; no statistical/PTR walk-forward yet;
 inverse-MM anchoring (v1.1 symmetric far-side anchor) unvalidated on real data —
 run `FM-Families.set` + CSV export in Strategy Tester visual mode, then review
-MAE/MFE per family before any live use.
+MAE/MFE per family before any live use. Ordered next steps (owner + acceptance
+per item): `FUTURE_ROADMAP.md` § "Next moves (ordered)".

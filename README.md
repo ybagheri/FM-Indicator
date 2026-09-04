@@ -109,14 +109,24 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 
 ## Limitations
 
-- v1.2 families + v2 tooling are implemented and mirror-tested (19 Python
-  tests), but live statistical validation is still pending — see roadmap
-  before any live use.
+- All engines (v1 core, v1.1 fixes, v1.2 families, v2 tooling, bar-by-bar
+  Phases 1–8, LTF confirm) are implemented and mirror-tested (97 Python
+  tests, all pass), but live statistical validation is still pending — see
+  roadmap before any live use.
 - Context (Trend/Range/Transition) defaults to LOG_ONLY — it annotates, never
-  vetoes, faithful to Brooks "context, not trigger". MTF overlay is likewise
-  read-only.
+  vetoes, faithful to Brooks "context, not trigger". MTF/LTF overlays and the
+  Phase-8 decision engine are likewise read-only: BUY/SELL are interpretation
+  labels, never orders; nothing here gates the FM state machine.
 - Compile in MetaEditor on Windows; this Linux env validates logic via the
   Python mirror (`tests/`), not `metaeditor.exe`.
+
+## Status / next steps
+
+Implementation in this repo is complete (Phases 0–8 + v1/v1.1/v1.2/v2).
+What remains is validation and execution, in order — see
+`docs/FUTURE_ROADMAP.md` § "Next moves (ordered)": MetaEditor compile +
+Strategy Tester visual run → walk-forward review from exported CSVs → v3 EA
+in a separate repo. No further indicator features are planned here.
 
 ## Docs
 
@@ -132,9 +142,11 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 `docs/SYSTEMATIC_SPECIFICATION.md` ·
 `docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/FUTURE_ROADMAP.md`
 
-## Self-critique (v1)
+## Self-critique
 
 Honest proxies, not "official Brooks rules"; thresholds are ATR-normalized but
-still ours. Inverse-MM target anchoring is the weakest point (failure-low
-minus leg range) — flagged for walk-forward review. No statistical validation
+still ours. Inverse-MM target anchoring is the weakest point (symmetric
+far-side anchor since v1.1) — flagged for walk-forward review. Breakout and
+reversal objectives are fixed `2.0×ATR` measurement proxies, not structural
+magnets (documented in `docs/GENERAL_SETUPS.md` §0). No statistical validation
 yet — see roadmap before any live use.

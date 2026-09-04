@@ -1,5 +1,49 @@
 # FUTURE ROADMAP — FM Indicator → Brooks-style bar-by-bar engine
 
+## Status (read this first)
+
+Implementation in this repo is COMPLETE: v1 core, v1.1 fixes, v1.2 families,
+v2 research tooling, bar-by-bar Phases 0–8, and the LTF confirm overlay —
+97 Python mirror tests, all passing. Nothing below adds indicator features;
+every remaining item is validation or execution. Work through
+`Next moves (ordered)` top to bottom; each item names its owner, its
+acceptance check, and what it unblocks.
+
+## Next moves (ordered)
+
+1. **MetaEditor compile (owner: human on Windows; unblocks everything).**
+   Copy `MQL5/Indicators/FM_Indicator.mq5` + `MQL5/Include/FM/*.mqh` to the
+   terminal, compile (F7). Accept: 0 errors, 0 warnings; attach to a chart,
+   confirm objects draw. Linux CI cannot do this (no `metaeditor.exe`/`wine`;
+   it runs the Python mirror + delimiter scan instead).
+2. **Strategy Tester visual run (owner: human; unblocks 3).** Run majors/H1
+   (plus M1 with `FM-M1-Scalp.set`), keep a screenshot log. Accept: no
+   runtime errors, DEBUG logs show bar/pullback/state/BO/MTR/plan/decision
+   lines, `FM_DECISION` label updates per closed bar.
+3. **Walk-forward review (owner: human/analyst; unblocks any live use).**
+   Enable `InpExportCSV` in tester runs (`FM-Families.set` for per-family
+   data), review MAE/MFE per family via `backtest_run`, then parameter
+   sensitivity / Monte Carlo notes. Accept: written review noting whether the
+   inverse-MM anchor (§5 SPEC, weakest point) and the `2.0×ATR` BO/reversal
+   objectives survive contact with real data. NOTHING in this repo may be
+   called validated before this step.
+4. **v3 EA (owner: separate repo; blocked on 3).** Reuse
+   `CFMEngine::ActiveSnapshots()` + DATA buffers; optimization framework +
+   walk-forward analysis live there. This indicator repo stays
+   execution-free — no orders, no auto-trading PRs accepted here.
+
+## Version map (three numbering axes — do not confuse them)
+
+- **Indicator `#property version` (currently 1.30):** the MT5 program
+  version stamped in `FM_Indicator.mq5`. Cosmetic release counter.
+- **SPEC generations v1 / v1.1 / v1.2 / v2:** capability layers of the FM
+  core (`SYSTEMATIC_SPECIFICATION.md`): v1 Leg1=Leg2 + inverse + states;
+  v1.1 correctness fixes; v1.2 families + wedge + score; v2 research tooling
+  (MTF/LTF/CSV/MAE-MFE/backtest).
+- **Phases 0–8:** the bar-by-bar expansion track (this file): Phase 0 audit,
+  Phase 1 bar foundation, Phases 2–6 pullback/state/BO/MTR/FM-plan engines,
+  Phase 7 general catalog, Phase 8 decision engine.
+
 ## Phase 0 (audit) — DONE
 - [x] Repo/history/code/docs audit (v1.2+v2 preserved, committed `206501b`).
 
