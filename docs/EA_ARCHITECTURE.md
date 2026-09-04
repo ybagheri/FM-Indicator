@@ -38,12 +38,20 @@ Chart/alerts    Execution/risk   CSV/backtest
   BACKTEST T-003 (same config as T-001) reproduces edge counts EXACTLY
   (528/528 reads, 91/11/5). See `MT5_TESTING_STATUS.md`.
 
-## 3. Phase 22 — Strategy Registry (PLANNED)
+## 3. Phase 22 — Strategy Registry ✅ DONE (commit: this phase)
 
-Single enum of genuinely-implemented strategies only: `FM_FADE` (SETUP_FM_FADE),
-`PULLBACK` (H1/H2/L1/L2), `BREAKOUT_FOLLOW`, `BREAKOUT_PENDING` (provisional),
-`FAILED_BO_INVERSE` (MM_INVERSE family), `MTR_MAJOR/MINOR`, `DOUBLE_SWING`,
-`DOUBLE_MICRO` (provisional). Modes SINGLE/MULTI/AUTO. No fake strategies.
+- `Analysis.mqh`: `FMAnalysisResult` gains `candidates[12]` + `candCount`
+  (full general catalog + FM-contest entry even when it does not win).
+  Additive only — indicator behavior unchanged (parity: MT5 T-004 reproduces
+  T-001 exactly, 528/528, 91/11/5; 0/0 compile; unit tests pass).
+- New `MQL5/Include/FM/StrategyRegistry.mqh`: `ENUM_FM_STRATEGY`
+  (NONE/FM_FADE/PULLBACK/BREAKOUT/REVERSAL/DOUBLE — only genuinely
+  implemented), `ENUM_STRATEGY_MODE` (SINGLE/MULTI/AUTO),
+  `StrategyCandidate`/`StrategySelection`, `CStrategyRegistry::Configure/
+  IsEnabled/BuildCandidates/Select` (deterministic score-max, firm beats
+  provisional on ties, then enum order, then entry).
+- FAILED_BO as a separate strategy deferred to Phase 28 (needs
+  inverse-family plumbing in the trade intent).
 
 ## 4. Phase 23 — EA Skeleton (PLANNED, ANALYSIS_ONLY first)
 

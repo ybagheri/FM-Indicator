@@ -27,6 +27,7 @@
 #include "FMEngine.mqh"
 
 #define FM_ANALYSIS_MAX_PLANS 20
+#define FM_ANALYSIS_MAX_CAND 12
 
 // Full per-closed-bar analysis output. Plain data only (no handles).
 struct FMAnalysisResult
@@ -67,6 +68,8 @@ struct FMAnalysisResult
    // Phase 7 (FM contest included: best may be SETUP_FM_FADE)
    GeneralSetup      best;
    bool              haveBest;
+   GeneralSetup      candidates[FM_ANALYSIS_MAX_CAND]; // full catalog (Phase 22)
+   int               candCount;
    bool              generalDone;
    // Phase 8
    DecisionContext   dctx;
@@ -105,6 +108,7 @@ public:
       ZeroMemory(res);
       res.valid = false;
       res.fmPlanCount = 0;
+      res.candCount = 0;
       CGeneralSetups::InitNone(res.best);
       res.haveBest = false;
       if(count < cfg.AtrPeriod + 2*cfg.SwingK + 20)
@@ -392,6 +396,9 @@ public:
             res.best = cand[best7];
             res.haveBest = true;
            }
+         // Phase 22: publish the full catalog (capped) for the registry.
+         for(int ci = 0; ci < ArraySize(cand) && res.candCount < FM_ANALYSIS_MAX_CAND; ci++)
+            res.candidates[res.candCount++] = cand[ci];
          // FM contest: best DEVELOPING/CONFIRMED plan joins with its ScoreSignal
          // and displaces the general best only on a strictly greater score.
          int fmScoreBest = -1;
@@ -449,6 +456,37 @@ public:
             res.haveBest = true;
             if(m_log != NULL)
                m_log.Debug(CGeneralSetups::Describe(f));
+           }
+         // Phase 22: FM-contest entry joins the catalog even when it does not
+         // win (MULTI mode with FM-only enabled must still see it).
+         if(fmPlanBest.valid && res.candCount < FM_ANALYSIS_MAX_CAND)
+           {
+            GeneralSetup ff;
+            CGeneralSetups::InitNone(ff);
+            ff.valid = true;
+            ff.type = SETUP_FM_FADE;
+            ff.dir = fmPlanBest.fadeDir;
+            ff.entry = fmPlanBest.entry;
+            ff.stop = fmPlanBest.stop;
+            ff.objective = fmPlanBest.objective;
+            ff.riskPts = fmPlanBest.riskPts;
+            ff.rewardPts = fmPlanBest.rewardPts;
+            ff.rMult = fmPlanBest.rMult;
+            ff.rrOK = fmPlanBest.rrOK;
+            ff.provisional = fmPlanBest.provisional;
+            ff.signalBar = fmPlanBest.signalShift;
+            ff.refPrice = fmPlanBest.entry;
+            ff.score = fmScoreBest;
+            bool dup = false;
+            for(int ci = 0; ci < res.candCount; ci++)
+               if(res.candidates[ci].type == SETUP_FM_FADE &&
+                  MathAbs(res.candidates[ci].entry - ff.entry) < _Point)
+                 {
+                  dup = true;
+                  break;
+                 }
+            if(!dup)
+               res.candidates[res.candCount++] = ff;
            }
          res.generalDone = true;
         }
