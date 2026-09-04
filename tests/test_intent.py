@@ -2,8 +2,9 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from trade_intent import (permits, provisional_ok, chase_ok, fm_match,
-                          STRAT_FM_FADE, STRAT_PULLBACK, STRAT_BREAKOUT,
-                          STRAT_REVERSAL, STRAT_DOUBLE)
+                          failedbo_geometry, STRAT_FM_FADE, STRAT_PULLBACK,
+                          STRAT_BREAKOUT, STRAT_REVERSAL, STRAT_DOUBLE,
+                          STRAT_FAILED_BO)
 
 
 def check_n(name, cond):
@@ -17,6 +18,7 @@ def test_permits():
     check_n("bo_trails", permits(STRAT_BREAKOUT) == (True, True, False))
     check_n("mtr_be_only", permits(STRAT_REVERSAL) == (True, False, False))
     check_n("dbl_be_only", permits(STRAT_DOUBLE) == (True, False, False))
+    check_n("permits_fbo", permits(STRAT_FAILED_BO) == (True, False, False))
 
 
 def test_provisional():
@@ -44,9 +46,23 @@ def test_fm_match():
     check_n("empty", fm_match([], -1, 1.1600) is None)
 
 
+def test_failedbo_geometry():
+    s = failedbo_geometry(+1, 1.1600, 0.0010)
+    check_n("fbo_sell", s["dir"] == -1 and s["entry"] == 1.1600)
+    check_n("fbo_stop", abs(s["stop"] - 1.16035) < 1e-9)
+    check_n("fbo_obj", abs(s["objective"] - 1.15800) < 1e-9)
+    check_n("fbo_score55", s["score"] == 55 and not s["provisional"])
+    check_n("fbo_rr", abs(s["rMult"] - 2.0 / 0.35) < 1e-9 and s["rrOK"])
+    m = failedbo_geometry(-1, 1.1400, 0.0010)
+    check_n("fbo_buy_mirror", m["dir"] == +1 and m["stop"] < m["entry"] < m["objective"])
+    check_n("fbo_bad_dir", failedbo_geometry(0, 1.16, 0.001) is None)
+    check_n("fbo_zero_atr", failedbo_geometry(+1, 1.16, 0.0) is None)
+
+
 if __name__ == "__main__":
     test_permits()
     test_provisional()
     test_chase()
     test_fm_match()
+    test_failedbo_geometry()
     print("ALL INTENT TESTS PASSED")

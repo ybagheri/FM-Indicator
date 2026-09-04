@@ -22,7 +22,8 @@ enum ENUM_FM_STRATEGY
    STRAT_BREAKOUT=3,   // SETUP_BREAKOUT (FOLLOW firm / PENDING provisional)
    STRAT_REVERSAL=4,   // SETUP_REVERSAL (MTR MAJOR firm / MINOR provisional)
    STRAT_DOUBLE=5,     // SETUP_DOUBLE (swing firm / micro provisional)
-   STRAT_COUNT=6
+   STRAT_FAILED_BO=6,  // SETUP_FAILED_BO (Phase 28: registry-built fade)
+   STRAT_COUNT=7
   };
 
 enum ENUM_STRATEGY_MODE
@@ -63,6 +64,7 @@ private:
          case SETUP_BREAKOUT:       return STRAT_BREAKOUT;
          case SETUP_REVERSAL:       return STRAT_REVERSAL;
          case SETUP_DOUBLE:         return STRAT_DOUBLE;
+         case SETUP_FAILED_BO:      return STRAT_FAILED_BO;
          default:                   return STRAT_NONE;
         }
      }
@@ -79,7 +81,7 @@ public:
 
    void              Configure(ENUM_STRATEGY_MODE mode, ENUM_FM_STRATEGY single,
                                bool useFM, bool usePB, bool useBO,
-                               bool useRev, bool useDbl)
+                               bool useRev, bool useDbl, bool useFailedBO)
      {
       m_mode = mode;
       m_single = single;
@@ -90,6 +92,7 @@ public:
       m_use[STRAT_BREAKOUT] = useBO;
       m_use[STRAT_REVERSAL] = useRev;
       m_use[STRAT_DOUBLE] = useDbl;
+      m_use[STRAT_FAILED_BO] = useFailedBO;
      }
 
    // Strategy enable-query (EA inputs call this; never invents strategies).
@@ -124,6 +127,54 @@ public:
          out[n].enabled = IsEnabled(st);
         }
       return ArraySize(out);
+     }
+
+   // Phase 28 — failed-breakout fade candidate, built from the BreakoutSignal
+   // (the catalog emits no target for failures by design). Geometry (proxy,
+   // see STRATEGY_CATALOG.md): fade dir opposite the failed BO; entry at the
+   // failed level; stop beyond it by (stopBuf+tol)×ATR; objective 2.0×ATR
+   // measured (FromBreakout convention); score 55 (failure confirmed,
+   // reversal unconfirmed: between PENDING 40 and FOLLOW 70).
+   bool              BuildFailedBO(const FMAnalysisResult &res, const CFMConfig &cfg,
+                                   StrategyCandidate &out)
+     {
+      out.valid = false;
+      out.enabled = false;
+      if(!res.valid || !res.boDone || !res.breakout.found)
+         return false;
+      if(res.breakout.outcome != BO_FAILED)
+         return false;
+      if(res.atr <= 0)
+         return false;
+      int bdir = res.breakout.dir;
+      if(bdir != +1 && bdir != -1)
+         return false;
+      double ref = res.breakout.refPrice;
+      double buf = (cfg.SetupStopBufATRMult + cfg.MMToleranceATRMult) * res.atr;
+      double objD = cfg.GeneralObjectiveATRMult * res.atr;
+      if(buf <= 0 || objD <= 0)
+         return false;
+      GeneralSetup g;
+      CGeneralSetups::InitNone(g);
+      g.type = SETUP_FAILED_BO;
+      g.dir = -bdir;
+      g.entry = ref;
+      g.stop = ref + (bdir > 0 ? buf : -buf);
+      g.objective = ref - (bdir > 0 ? objD : -objD);
+      g.riskPts = MathAbs(g.entry - g.stop);
+      g.rewardPts = MathAbs(g.entry - g.objective);
+      g.provisional = false;
+      g.signalBar = res.breakout.boBar;
+      g.refPrice = ref;
+      g.score = 55;
+      CGeneralSetups::Finish(g, cfg);
+      if(!g.valid)
+         return false;
+      out.valid = true;
+      out.strategy = STRAT_FAILED_BO;
+      out.setup = g;
+      out.enabled = IsEnabled(STRAT_FAILED_BO);
+      return true;
      }
 
    // Deterministic selection under the configured mode. Phase-22 rule:
@@ -180,6 +231,7 @@ public:
          case STRAT_BREAKOUT: return "BREAKOUT";
          case STRAT_REVERSAL: return "REVERSAL_MTR";
          case STRAT_DOUBLE:   return "DOUBLE";
+         case STRAT_FAILED_BO: return "FAILED_BO";
          default:             return "NONE";
         }
      }

@@ -45,7 +45,34 @@
   overshoot); discretionary "quality of the test" is NOT observable;
   inverse-MM anchor is the weakest point (walk-forward pending).
 
-## FAILED_BO — fading the failed breakout (Phase 28, PLANNED)
+## FAILED_BO — fading the failed breakout (Phase 28 ✅)
+
+- What: fading a breakout that printed beyond a reference level and closed
+  back inside (bull-BO failure → SELL, bear-BO failure → BUY).
+- Why it matters: failed breakouts trap momentum traders; the reversal
+  through the level is Brooks' classic failure-fade with a tight structural
+  stop (the failed level itself).
+- Context required: a `BO_FAILED` outcome on the current bar (N-bar or swing
+  reference, FAILED precedence over follow-through per Phase 4).
+- Chart: no dedicated FM objects; the Phase-4 DEBUG line
+  (`BO ... FAILED`) is the evidence; EA intent logs the fade.
+- Detection: `CBreakoutEngine::Analyze` outcome; registry `BuildFailedBO`
+  converts it to a setup (the catalog emits no targets for failures).
+- Geometry (documented proxy): entry = failed level; stop = level +
+  (stopBuf+tol)×ATR beyond; objective = 2.0×ATR measured (FromBreakout
+  convention); score 55 (failure confirmed, reversal unconfirmed — between
+  PENDING 40 and FOLLOW 70); firm (never provisional).
+- Confirms it: the FAILED outcome itself (break + reclaim closes).
+- Invalidates it: STOP (level + buffer).
+- EA entry/stop/target/refusal: same market-next-open + chase + risk gates
+  as FM; BE allowed, trail OFF (fixed 2ATR objective).
+- False positives: PENDING breakouts misread as failed (outcome gate
+  prevents); second-leg trap (trapArmed flag — Phase-8 trap-repeat veto and
+  EA caution, not a block).
+- Repaint: no — outcome decided on closed bars with FAILED precedence.
+- Automation limits: failure extreme price is NOT in the signal (stop uses
+  level+buffer proxy, not the excursion extreme); no follow-through required
+  (by design — the reclaim IS the trigger).
 ## PULLBACK — H1/H2/L1/L2 trend resumption (Phase 29, PLANNED)
 ## BREAKOUT — FOLLOW/pending continuation (Phase 29, PLANNED)
 ## REVERSAL_MTR — major/minor reversal (Phase 30, PLANNED)

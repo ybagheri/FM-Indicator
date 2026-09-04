@@ -19,7 +19,8 @@ enum ENUM_SETUP_TYPE
    SETUP_DOUBLE=2,
    SETUP_BREAKOUT=3,
    SETUP_REVERSAL=4,
-   SETUP_FM_FADE=5   // Phase-6 FM plan converted for the Phase-8 contest (§5)
+   SETUP_FM_FADE=5,   // Phase-6 FM plan converted for the Phase-8 contest (§5)
+   SETUP_FAILED_BO=6  // Phase 28: EA-side failed-breakout fade (registry-built)
   };
 
 struct GeneralSetup
@@ -252,6 +253,7 @@ public:
          case SETUP_BREAKOUT:       return "BREAKOUT";
          case SETUP_REVERSAL:       return "REVERSAL";
          case SETUP_FM_FADE:        return "FM_FADE";
+         case SETUP_FAILED_BO:      return "FAILED_BO";
          default:                   return "NONE";
         }
      }

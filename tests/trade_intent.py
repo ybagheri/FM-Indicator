@@ -37,5 +37,27 @@ def fm_match(plans, fade_dir, entry):
     return None
 
 
+def failedbo_geometry(bo_dir, ref, atr, stop_buf_mult=0.10, tol_mult=0.25,
+                      obj_mult=2.0, min_rr=1.0):
+    """Mirror of BuildFailedBO geometry. Returns setup dict or None."""
+    if bo_dir not in (+1, -1) or atr <= 0:
+        return None
+    buf = (stop_buf_mult + tol_mult) * atr
+    obj_d = obj_mult * atr
+    if buf <= 0 or obj_d <= 0:
+        return None
+    entry = ref
+    stop = ref + buf if bo_dir > 0 else ref - buf
+    obj = ref - obj_d if bo_dir > 0 else ref + obj_d
+    risk, reward = abs(entry - stop), abs(entry - obj)
+    if risk <= 0 or reward <= 0:
+        return None
+    r = reward / risk
+    return {"type": "FAILED_BO", "dir": -bo_dir, "entry": entry,
+            "stop": stop, "objective": obj, "risk": risk, "reward": reward,
+            "rMult": r, "rrOK": r + 1e-9 >= min_rr, "score": 55,
+            "provisional": False, "valid": True}
+
+
 if __name__ == "__main__":
     print("mirror import OK")

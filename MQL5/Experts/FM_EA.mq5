@@ -28,6 +28,7 @@ input bool               InpUsePullback    = true;
 input bool               InpUseBreakout    = true;
 input bool               InpUseReversal    = true;
 input bool               InpUseDouble      = true;
+input bool               InpUseFailedBO    = true;   // Phase 28
 input long               InpMagic          = 20260904;
 input int                InpHistoryBars    = 1500;
 //--- risk inputs (Phase 24; sizing + caps, still ANALYSIS_ONLY)
@@ -76,7 +77,7 @@ int OnInit()
    g_analysis.Setup(g_cfg, GetPointer(g_log));
    g_registry.Configure(InpStratMode, InpSingleStrategy,
                         InpUseFM, InpUsePullback, InpUseBreakout,
-                        InpUseReversal, InpUseDouble);
+                        InpUseReversal, InpUseDouble, InpUseFailedBO);
    g_risk.Configure(InpLotMode, InpFixedLot, InpRiskPct, InpMoneyRisk,
                     InpMaxDailyLoss, InpMaxTradesDay, InpMaxOpenPos,
                     InpMaxPerSymbol, InpMaxConsecLoss, InpMaxSpreadPts,
@@ -151,6 +152,15 @@ void OnTick()
 
    StrategyCandidate cand[];
    int n = g_registry.BuildCandidates(res, cand);
+   // Phase 28: failed-BO candidate joins the catalog.
+   StrategyCandidate fbo;
+   if(g_registry.BuildFailedBO(res, g_cfg, fbo))
+     {
+      int m = ArraySize(cand);
+      ArrayResize(cand, m + 1);
+      cand[m] = fbo;
+      n = ArraySize(cand);
+     }
    StrategySelection sel = g_registry.Select(cand);
    if(sel.hasTrade)
      {
@@ -162,15 +172,20 @@ void OnTick()
       RiskDecision rd = g_risk.Check(_Symbol, sel.setup, spread, ymd);
       if(rd.allowed)
          g_riskOK++;
-      // Phase 27: FM intent (other strategies log pending until 28–30).
+      // Phase 27–28: FM + failed-BO intents (29–30 add the rest).
       string intentTxt = "INTENT_PENDING_PHASE";
-      if(sel.strategy == STRAT_FM_FADE && rd.allowed)
+      if(rd.allowed && (sel.strategy == STRAT_FM_FADE || sel.strategy == STRAT_FAILED_BO))
         {
          double px = (sel.setup.dir > 0 ? SymbolInfoDouble(_Symbol, SYMBOL_ASK)
                                         : SymbolInfoDouble(_Symbol, SYMBOL_BID));
          TradeIntent ti;
          string why = "";
-         if(g_intent.FromFM(sel.setup, res, px, why, ti))
+         bool made = false;
+         if(sel.strategy == STRAT_FM_FADE)
+            made = g_intent.FromFM(sel.setup, res, px, why, ti);
+         else
+            made = g_intent.FromFailedBO(sel.setup, px, res.atr, why, ti);
+         if(made)
             intentTxt = StringFormat("WOULD_%s %s",
                                      (ti.dir > 0 ? "BUY" : "SELL"), ti.note);
          else

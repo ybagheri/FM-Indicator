@@ -6,16 +6,17 @@ then lower strategy enum, then lower entry. Empty -> no trade.
 """
 STRAT_NONE, STRAT_FM_FADE, STRAT_PULLBACK = 0, 1, 2
 STRAT_BREAKOUT, STRAT_REVERSAL, STRAT_DOUBLE = 3, 4, 5
+STRAT_FAILED_BO = 6
 MODE_SINGLE, MODE_MULTI, MODE_AUTO = 0, 1, 2
 
 
 def map_type(t):
     return {"FM_FADE": 1, "PULLBACK": 2, "BREAKOUT": 3,
-            "REVERSAL": 4, "DOUBLE": 5}.get(t, 0)
+            "REVERSAL": 4, "DOUBLE": 5, "FAILED_BO": 6}.get(t, 0)
 
 
 def is_enabled(s, mode, single, uses):
-    if s <= 0 or s >= 6:
+    if s <= 0 or s >= 7:
         return False
     if mode == MODE_SINGLE:
         return s == single

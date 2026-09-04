@@ -144,7 +144,29 @@ public:
       return true;
      }
 
-   // Phases 28 (failed-BO), 29 (pullback/breakout), 30 (reversal/double)
+   // Phase 28 — failed-breakout fade intent (registry-built setup).
+   bool              FromFailedBO(const GeneralSetup &s,
+                                  double price, double atr,
+                                  string &skipWhy, TradeIntent &in) const
+     {
+      ZeroMemory(in);
+      if(!s.valid || s.type != SETUP_FAILED_BO)
+        {
+         skipWhy = "NOT_FAILED_BO";
+         return false;
+        }
+      if(!GateProvisional(s.provisional, skipWhy))
+         return false;
+      if(!GateChase(s.dir, s.entry, price, atr, skipWhy))
+         return false;
+      FillFromSetup(in, STRAT_FAILED_BO, s);
+      in.invalidation = "STOP_failed_level";
+      in.note = StringFormat("Failed-BO fade %s score=%d R=%.2f",
+                             (s.dir > 0 ? "BUY" : "SELL"), s.score, s.rMult);
+      return true;
+     }
+
+   // Phases 29 (pullback/breakout), 30 (reversal/double)
    // builders arrive in their phase commits.
   };
 
