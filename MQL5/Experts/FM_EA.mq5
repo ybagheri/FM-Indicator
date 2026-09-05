@@ -14,6 +14,7 @@
 #include <FM/Logger.mqh>
 #include <FM/Analysis.mqh>
 #include <FM/StrategyRegistry.mqh>
+#include <FM/ParityDecision.mqh> // Phase 3: shared candidate/selection builder
 #include <FM/RiskManager.mqh>
 #include <FM/ExecutionEngine.mqh>  // Phase 25: constructed+configured, no calls yet
 #include <FM/PositionManager.mqh>  // Phase 26: manage/BE/trail owned positions
@@ -272,30 +273,23 @@ void OnTick()
       PrintFormat("[FM_EA] closed profit=%.2f", closedProfits[i]);
      }
 
+   // Phase 3 parity: shared builder — identical universe (catalog +
+   // FAILED_BO) and Select/SelectAuto as the Indicator (CParityBuilder).
+   // Downstream (veto → risk → intent → execution) is untouched.
+   AutoTuning at;
+   at.trendBonus = InpAutoTrendBonus;
+   at.provPenalty = InpAutoProvPenalty;
+   at.rrBonus = InpAutoRRBonus;
+   at.rrLevel = InpAutoRRLevel;
+   FMParityDecision pd;
+   CParityBuilder::Build(res, g_cfg, g_registry, InpStratMode, at, pd);
    StrategyCandidate cand[];
-   int n = g_registry.BuildCandidates(res, cand);
-   // Phase 28: failed-BO candidate joins the catalog.
-   StrategyCandidate fbo;
-   if(g_registry.BuildFailedBO(res, g_cfg, fbo))
-     {
-      int m = ArraySize(cand);
-      ArrayResize(cand, m + 1);
-      cand[m] = fbo;
-      n = ArraySize(cand);
-     }
-   StrategySelection sel;
-   int autoFinal = -1;
-   if(InpStratMode == STRAT_MODE_AUTO)
-     {
-      AutoTuning at;
-      at.trendBonus = InpAutoTrendBonus;
-      at.provPenalty = InpAutoProvPenalty;
-      at.rrBonus = InpAutoRRBonus;
-      at.rrLevel = InpAutoRRLevel;
-      sel = g_registry.SelectAuto(cand, res, at, autoFinal);
-     }
-   else
-      sel = g_registry.Select(cand);
+   ArrayResize(cand, pd.candCount);
+   for(int pdi = 0; pdi < pd.candCount; pdi++)
+      cand[pdi] = pd.candidates[pdi];
+   int n = pd.candCount;
+   StrategySelection sel = pd.selection;
+   int autoFinal = pd.autoFinal;
    // Phase 31: Phase-8 structural vetoes apply in ALL modes.
    // EXP-0002 apparatus: InpApplyStructuralVeto=false counts vetoes but
    // proceeds (vetoWhy retained for alternate tagging + bypass log).
