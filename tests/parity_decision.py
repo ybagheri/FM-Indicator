@@ -10,7 +10,9 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from strategy_registry import (map_type, is_enabled, auto_final,
+                               decision_veto,
                                MODE_SINGLE, MODE_MULTI, MODE_AUTO)
+from trade_intent import provisional_ok, chase_ok, side_ok
 
 MAX_CAND = 13  # FM_PARITY_MAX_CAND
 
@@ -95,6 +97,61 @@ def build(catalog, fbo, mode, single, uses, state, state_valid, tuning):
     return {"valid": True, "candCount": len(uni), "universe": uni,
             "has_trade": ok, "strategy": st, "setup": setup,
             "autoFinal": final}
+
+
+# --- Phase 5: veto + risk-RR + intent final-signal pipeline ---
+# Mirrors FM_EA veto block + RiskManager::Check LOW_RR gate (strict, no eps,
+# verbatim) + CTradeIntentBuilder gate order (provisional → chase → side),
+# and the indicator projection (price = closed-bar close).
+
+def detect_veto(has_trade, decision_done, reason_best):
+    """Mirror of CParityBuilder::DetectVeto."""
+    if not has_trade or not decision_done:
+        return ""
+    return decision_veto(reason_best)
+
+
+def risk_rr_ok(setup, min_rr):
+    """Mirror of the Check LOW_RR gate only (strict `<`, 0 = off)."""
+    if min_rr > 0 and setup["rMult"] < min_rr:
+        return (False, "LOW_RR")
+    return (True, "")
+
+
+def project_intent(setup, price, atr, trade_provisional, chase_mult):
+    """Mirror of the From* gate chain. Returns (made, why, dir)."""
+    ok, why = provisional_ok(setup["provisional"], trade_provisional)
+    if not ok:
+        return (False, "SKIP_" + why, 0)
+    ok, why = chase_ok(setup["dir"], setup["entry"], price, atr, chase_mult)
+    if not ok:
+        return (False, "SKIP_" + why, 0)
+    ok, why = side_ok(setup["dir"], setup["stop"], price)
+    if not ok:
+        return (False, "SKIP_" + why, 0)
+    side = "BUY" if setup["dir"] > 0 else "SELL"
+    return (True, "WOULD_" + side, setup["dir"])
+
+
+def final_signal(has_trade, strategy, setup, reason_best, decision_done,
+                 apply_veto, min_rr, price, atr, trade_provisional,
+                 chase_mult):
+    """Full pipeline mirror. Returns (action, why) with action in
+    {BUY, SELL, NO_TRADE}. WAIT never blocks WOULD_ (EA gates only the five
+    veto reasons + risk + intent) — locked here, not fixed, per spec §20."""
+    veto = detect_veto(has_trade, decision_done, reason_best)
+    if veto and apply_veto:
+        return ("NO_TRADE", veto)
+    if not has_trade:
+        return ("NO_TRADE", "NO_SETUP")
+    ok, why = risk_rr_ok(setup, min_rr)
+    if not ok:
+        return ("NO_TRADE", "SKIP_" + why)
+    made, why, d = project_intent(setup, price, atr, trade_provisional,
+                                  chase_mult)
+    if made:
+        return ("BUY" if d > 0 else "SELL", why)
+    return ("NO_TRADE", why)
 
 
 if __name__ == "__main__":

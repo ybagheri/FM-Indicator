@@ -293,19 +293,10 @@ void OnTick()
    // Phase 31: Phase-8 structural vetoes apply in ALL modes.
    // EXP-0002 apparatus: InpApplyStructuralVeto=false counts vetoes but
    // proceeds (vetoWhy retained for alternate tagging + bypass log).
+   // Detection is shared (CParityBuilder::DetectVeto); census stays here.
    string vetoWhy = "";
    ENUM_DECISION_REASON vetoDr = REASON_OK;
-   if(sel.hasTrade && res.decisionDone)
-     {
-      ENUM_DECISION_REASON dr = res.decision.reason;
-      if(dr == REASON_BARBWIRE || dr == REASON_MID_RANGE ||
-         dr == REASON_CONFLICT || dr == REASON_NO_EDGE ||
-         dr == REASON_TRAP_REPEAT)
-        {
-         vetoWhy = "DECISION_VETO_" + CDecisionEngine::ReasonName(dr);
-         vetoDr = dr;
-        }
-     }
+   CParityBuilder::DetectVeto(res, sel, vetoWhy, vetoDr);
    bool vetoBypassed = false;
    if(sel.hasTrade && vetoWhy != "")
      {

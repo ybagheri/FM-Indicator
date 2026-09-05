@@ -97,6 +97,28 @@ public:
          out.selection = reg.Select(tmp);
       out.valid = true;
      }
+
+   // EA structural-veto detection, verbatim (FM_EA.mq5 veto block): the five
+   // context-level reasons (BARBWIRE/MID_RANGE/CONFLICT/NO_EDGE/TRAP_REPEAT)
+   // veto any selection in ALL modes. Counting/bypass/logging stay in the EA;
+   // both programs derive vetoWhy here so triggers can never diverge.
+   static void       DetectVeto(const FMAnalysisResult &res,
+                                const StrategySelection &sel,
+                                string &vetoWhy, ENUM_DECISION_REASON &vetoDr)
+     {
+      vetoWhy = "";
+      vetoDr = REASON_OK;
+      if(!sel.hasTrade || !res.decisionDone)
+         return;
+      ENUM_DECISION_REASON dr = res.decision.reason;
+      if(dr == REASON_BARBWIRE || dr == REASON_MID_RANGE ||
+         dr == REASON_CONFLICT || dr == REASON_NO_EDGE ||
+         dr == REASON_TRAP_REPEAT)
+        {
+         vetoWhy = "DECISION_VETO_" + CDecisionEngine::ReasonName(dr);
+         vetoDr = dr;
+        }
+     }
   };
 
 #endif

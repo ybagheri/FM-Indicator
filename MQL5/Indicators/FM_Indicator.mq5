@@ -50,6 +50,7 @@
 #include <FM/Alerts.mqh>
 #include <FM/StrategyRegistry.mqh>  // Phase 1: parity — mode/single/enable/AUTO types + registry
 #include <FM/ParityDecision.mqh>    // Phase 3: parity — shared candidate/selection builder
+#include <FM/TradeIntent.mqh>       // Phase 5: parity — closed-bar intent projection
 
 #include <FM/Inputs.mqh>     // Phase 23: shared analysis inputs (verbatim)
 
@@ -73,6 +74,8 @@ input double             InpAutoRRLevel     = 2.0;
 input bool               InpApplyStructuralVeto = true;  // EXP-0002 apparatus
 input bool               InpTradeProvisional    = false; // intent gate (Phase 5)
 input double             InpChaseATRMult        = 0.50;  // intent chase (Phase 5)
+input double             InpRiskMinRR           = 1.0;   // risk LOW_RR projection, 0=off (Phase 5)
+input int                InpMaxHoldBars         = 5;     // intent max-hold projection (Phase 5)
 
 //--- buffers
 double BufTarget[];
@@ -91,6 +94,7 @@ CVisualizer    g_viz;
 CAlertManager  g_alerts;
 CStrategyRegistry g_registry; // Phase 1: parity — configured, selection wired in Phase 4
 FMParityDecision g_parity;       // Phase 3: parity — shared builder output (universe+selection)
+CTradeIntentBuilder g_indIntent; // Phase 5: parity — closed-bar intent projection
 datetime       g_last_closed_time = 0;
 bool           g_first_run = true;
 
@@ -106,6 +110,8 @@ int OnInit()
    g_registry.Configure(InpStratMode, InpSingleStrategy,
                         InpUseFM, InpUsePullback, InpUseBreakout,
                         InpUseReversal, InpUseDouble, InpUseFailedBO);
+   // Phase 5 parity: same intent configuration as FM_EA.mq5:112.
+   g_indIntent.Configure(InpTradeProvisional, InpMaxHoldBars, InpChaseATRMult);
 
    SetIndexBuffer(0, BufTarget, INDICATOR_DATA);
    SetIndexBuffer(1, BufPotential, INDICATOR_DATA);
@@ -254,15 +260,76 @@ int OnCalculate(const int rates_total,
        else if(!g_cfg.EnableDecision)
           dec.reason = REASON_DISABLED;
        g_parity.decision = dec;
+       // Phase 5 parity: EA final-signal pipeline mirrored at the closed bar —
+       // veto (shared DetectVeto, same best-based coupling as the EA) →
+       // risk LOW_RR projection (Check order/gate, strict, verbatim) →
+       // intent projection at the closed-bar close (EA uses next-tick Ask/Bid;
+       // live-tick chase/side divergence is expected and documented).
+       ENUM_DECISION_REASON indVetoDr = REASON_OK;
+       CParityBuilder::DetectVeto(res, g_parity.selection, g_parity.vetoWhy, indVetoDr);
+       bool indVetoApplied = (g_parity.vetoWhy != "" && InpApplyStructuralVeto);
+       string indRiskWhy = "";
+       if(!indVetoApplied && g_parity.selection.hasTrade && InpRiskMinRR > 0 &&
+          g_parity.selection.setup.rMult < InpRiskMinRR)
+          indRiskWhy = "LOW_RR";
+       TradeIntent indTI;
+       string indSkip = "";
+       bool indMade = false;
+       if(!indVetoApplied && g_parity.selection.hasTrade && indRiskWhy == "")
+         {
+          double indPx = res.dctx.close;
+          ENUM_FM_STRATEGY iss = g_parity.selection.strategy;
+          GeneralSetup ssel = g_parity.selection.setup;
+          if(iss == STRAT_FM_FADE)
+             indMade = g_indIntent.FromFM(ssel, res, indPx, indSkip, indTI);
+          else if(iss == STRAT_FAILED_BO)
+             indMade = g_indIntent.FromFailedBO(ssel, indPx, res.atr, indSkip, indTI);
+          else if(iss == STRAT_PULLBACK)
+             indMade = g_indIntent.FromPullback(ssel, indPx, res.atr, indSkip, indTI);
+          else if(iss == STRAT_BREAKOUT)
+             indMade = g_indIntent.FromBreakout(ssel, indPx, res.atr, indSkip, indTI);
+          else if(iss == STRAT_REVERSAL)
+             indMade = g_indIntent.FromReversal(ssel, indPx, res.atr, indSkip, indTI);
+          else if(iss == STRAT_DOUBLE)
+             indMade = g_indIntent.FromDouble(ssel, indPx, res.atr, indSkip, indTI);
+          else
+             indSkip = "NO_STRATEGY";
+         }
+       string finAct;
+       string finWhy;
+       if(indVetoApplied)
+         { finAct = "NO_TRADE"; finWhy = g_parity.vetoWhy; }
+       else if(!g_parity.selection.hasTrade)
+         { finAct = "NO_TRADE"; finWhy = "NO_SETUP"; }
+       else if(indRiskWhy != "")
+         { finAct = "NO_TRADE"; finWhy = "SKIP_" + indRiskWhy; }
+       else if(indMade)
+         {
+          finAct = (indTI.dir > 0 ? "BUY" : "SELL");
+          finWhy = StringFormat("R=%.2f", indTI.rMult);
+          g_parity.intentWhy = StringFormat("WOULD_%s", finAct);
+          g_parity.intentDir = indTI.dir;
+         }
+       else
+         {
+          finAct = "NO_TRADE"; finWhy = "SKIP_" + indSkip;
+          g_parity.intentWhy = "SKIP_" + indSkip;
+          g_parity.intentDir = 0;
+         }
+       g_log.Debug(StringFormat("PARITY final=%s %s dec=%s/%s veto=%s intent=%s",
+          finAct, CStrategyRegistry::StrategyName(g_parity.selection.strategy),
+          CDecisionEngine::ActionName(dec.action), CDecisionEngine::ReasonName(dec.reason),
+          (g_parity.vetoWhy == "" ? "-" : g_parity.vetoWhy),
+          (g_parity.intentWhy == "" ? "-" : g_parity.intentWhy)));
        // Adapter below: FM_DECISION label + LTF confirm (read-only).
        if(g_cfg.EnableDecision && res.decisionDone)
          {
-          color dc=(dec.action==DEC_BUY?clrLime:(dec.action==DEC_SELL?clrRed:(dec.action==DEC_WAIT?clrOrange:clrGray)));
+          color dc=((finAct == "BUY") ? clrLime : ((finAct == "SELL") ? clrRed : clrGray));
           string stratTxt = CStrategyRegistry::StrategyName(g_parity.selection.strategy);
           string modeTxt = CStrategyRegistry::ModeName(InpStratMode);
           string finTxt = ((InpStratMode == STRAT_MODE_AUTO && g_parity.autoFinal >= 0)
                            ? StringFormat(" f=%d", g_parity.autoFinal) : "");
-          string dtxt=StringFormat("%s %s %s %s%s",CDecisionEngine::ActionName(dec.action),CDecisionEngine::ReasonName(dec.reason),modeTxt,stratTxt,finTxt);
+          string dtxt=StringFormat("%s %s %s %s%s",finAct,finWhy,modeTxt,stratTxt,finTxt);
           if(ObjectFind(0,"FM_DECISION")<0) ObjectCreate(0,"FM_DECISION",OBJ_TEXT,0,time[1],close[1]);
           ObjectSetString(0,"FM_DECISION",OBJPROP_TEXT,dtxt);
           ObjectSetInteger(0,"FM_DECISION",OBJPROP_COLOR,dc);
