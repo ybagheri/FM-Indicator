@@ -89,6 +89,7 @@ CFMAnalysis    g_analysis;   // Phase 21: shared contract (owns ATR/swings/engin
 CVisualizer    g_viz;
 CAlertManager  g_alerts;
 CStrategyRegistry g_registry; // Phase 1: parity — configured, selection wired in Phase 4
+StrategyCandidate g_indCand[];   // Phase 2: parity — registry candidate universe (incl. FAILED_BO)
 datetime       g_last_closed_time = 0;
 bool           g_first_run = true;
 
@@ -218,8 +219,28 @@ int OnCalculate(const int rates_total,
       // Shared analysis contract (Phase 21): single-source pipeline
       // (ATR → swings → projections → FM engine → Phases 1–8).
       FMAnalysisResult res;
-      g_analysis.Update(rates, rates_total, g_cfg, 1, res);
-      double atrNow = g_analysis.AtrAt(1);
+       g_analysis.Update(rates, rates_total, g_cfg, 1, res);
+       double atrNow = g_analysis.AtrAt(1);
+       // Phase 2 parity: build the same registry candidate universe the EA
+       // evaluates (FM_EA.mq5:275-285 verbatim, minus order-side state).
+       // BuildFailedBO needs only res+cfg (no trading/account state), so every
+       // EA strategy is evaluable in indicator context — no isolation needed.
+       int nIndCand = g_registry.BuildCandidates(res, g_indCand);
+       StrategyCandidate indFBO;
+       if(g_registry.BuildFailedBO(res, g_cfg, indFBO))
+         {
+          int m = ArraySize(g_indCand);
+          ArrayResize(g_indCand, m + 1);
+          g_indCand[m] = indFBO;
+          nIndCand = ArraySize(g_indCand);
+         }
+       string indCensus = "";
+       for(int cci = 0; cci < ArraySize(g_indCand); cci++)
+          indCensus += StringFormat(" %s/%d%s",
+             CStrategyRegistry::StrategyName(g_indCand[cci].strategy),
+             g_indCand[cci].setup.score,
+             (g_indCand[cci].setup.provisional ? "P" : ""));
+       g_log.Debug(StringFormat("REGISTRY cands=%d:%s", nIndCand, indCensus));
       // Phases 1–5 run inside CFMAnalysis::Update (see Analysis.mqh).
        // Phase 6 runs inside CFMAnalysis::Update (see Analysis.mqh).
        // Phases 7–8 run inside CFMAnalysis::Update (see Analysis.mqh).
