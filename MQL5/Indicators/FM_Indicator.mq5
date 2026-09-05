@@ -76,6 +76,9 @@ input bool               InpTradeProvisional    = false; // intent gate (Phase 5
 input double             InpChaseATRMult        = 0.50;  // intent chase (Phase 5)
 input double             InpRiskMinRR           = 1.0;   // risk LOW_RR projection, 0=off (Phase 5)
 input int                InpMaxHoldBars         = 5;     // intent max-hold projection (Phase 5)
+input bool               InpDiagnosticMode      = false; // Phase 6: verbose per-bar parity dashboard (DEBUG)
+input bool               InpShowParityLabel     = true;  // Phase 6: FM_PARITY detail label (WAIT-visible)
+input bool               InpShowParityLevels    = false; // Phase 6: selection entry/SL/TP lines
 
 //--- buffers
 double BufTarget[];
@@ -166,6 +169,22 @@ int TFBias(int tfMinutes)
 
 int MTFBias() { return TFBias(InpMTFTrendTFMinutes); }
 int LTFBias() { return TFBias(InpLTFMinutes); }
+
+// Phase 6: selection level lines (entry/SL/TP of the registry pick).
+// Created/moved per closed bar while InpShowParityLevels and a BUY/SELL
+// projection exists; deleted otherwise. FM_ prefix → auto-cleaned on deinit.
+void ParityLevelLine(string name, double px, color cl)
+  {
+   if(px <= 0)
+      return;
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_HLINE, 0, 0, px);
+   ObjectSetDouble(0, name, OBJPROP_PRICE, px);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, cl);
+   ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASH);
+   ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, name, OBJPROP_BACK, true);
+  }
 
 // v2 research export: append one CSV row per CONFIRMED (closed-bar only).
 void ExportSignalRow(datetime bt, const CFMSetup &s, double px, int score)
@@ -321,6 +340,30 @@ int OnCalculate(const int rates_total,
           CDecisionEngine::ActionName(dec.action), CDecisionEngine::ReasonName(dec.reason),
           (g_parity.vetoWhy == "" ? "-" : g_parity.vetoWhy),
           (g_parity.intentWhy == "" ? "-" : g_parity.intentWhy)));
+       // Phase 6 diagnostic dashboard (DEBUG only): full candidate table +
+       // selection + decision + veto + intent + final for EA comparison.
+       if(InpDiagnosticMode)
+         {
+          string diag = "";
+          for(int dci = 0; dci < g_parity.candCount; dci++)
+            {
+             StrategyCandidate dcc = g_parity.candidates[dci];
+             diag += StringFormat(" [%s %s s=%d R=%.2f%s%s]",
+                CStrategyRegistry::StrategyName(dcc.strategy),
+                (dcc.setup.dir > 0 ? "BUY" : (dcc.setup.dir < 0 ? "SELL" : "FLAT")),
+                dcc.setup.score, dcc.setup.rMult,
+                (dcc.setup.provisional ? " PROV" : ""),
+                (dcc.enabled ? "" : " OFF"));
+            }
+          g_log.Debug(StringFormat("DIAG mode=%s single=%s cands=%d%s | sel=%s f=%d | dec=%s/%s | veto=%s applied=%d | intent=%s | final=%s %s",
+             CStrategyRegistry::ModeName(InpStratMode),
+             CStrategyRegistry::StrategyName(InpSingleStrategy),
+             g_parity.candCount, diag,
+             CStrategyRegistry::StrategyName(g_parity.selection.strategy), g_parity.autoFinal,
+             CDecisionEngine::ActionName(dec.action), CDecisionEngine::ReasonName(dec.reason),
+             (g_parity.vetoWhy == "" ? "-" : g_parity.vetoWhy), (indVetoApplied ? 1 : 0),
+             (g_parity.intentWhy == "" ? "-" : g_parity.intentWhy), finAct, finWhy));
+         }
        // Adapter below: FM_DECISION label + LTF confirm (read-only).
        if(g_cfg.EnableDecision && res.decisionDone)
          {
@@ -345,6 +388,40 @@ int OnCalculate(const int rates_total,
                 lc,InpLTFMinutes,ltfB,CGeneralSetups::TypeName(dec.setupType),
                 CDecisionEngine::ActionName(dec.action)));
             }
+          // Phase 6: parity detail label (WAIT-visible) + selection levels.
+          if(InpShowParityLabel)
+            {
+             string ptxt=StringFormat("DEC %s %s | VETO %s | INTENT %s",
+                CDecisionEngine::ActionName(dec.action), CDecisionEngine::ReasonName(dec.reason),
+                (g_parity.vetoWhy == "" ? "-" : g_parity.vetoWhy),
+                (g_parity.intentWhy == "" ? "-" : g_parity.intentWhy));
+             if(ObjectFind(0,"FM_PARITY")<0) ObjectCreate(0,"FM_PARITY",OBJ_TEXT,0,time[1],low[1]);
+             ObjectSetString(0,"FM_PARITY",OBJPROP_TEXT,ptxt);
+             ObjectSetInteger(0,"FM_PARITY",OBJPROP_COLOR,clrLightGray);
+             ObjectSetInteger(0,"FM_PARITY",OBJPROP_FONTSIZE,8);
+             ObjectSetInteger(0,"FM_PARITY",OBJPROP_ANCHOR,ANCHOR_LEFT);
+             ObjectMove(0,"FM_PARITY",0,time[1],low[1]);
+            }
+          if(InpShowParityLevels && (finAct == "BUY" || finAct == "SELL") &&
+             g_parity.selection.hasTrade)
+            {
+             ParityLevelLine("FM_P_ENTRY", g_parity.selection.setup.entry, clrAqua);
+             ParityLevelLine("FM_P_STOP", g_parity.selection.setup.stop, clrRed);
+             ParityLevelLine("FM_P_TP", g_parity.selection.setup.objective, clrLime);
+            }
+          else
+            {
+             ObjectDelete(0, "FM_P_ENTRY");
+             ObjectDelete(0, "FM_P_STOP");
+             ObjectDelete(0, "FM_P_TP");
+            }
+         }
+       else
+         {
+          // Decision engine off (or not ready): never leave stale parity art.
+          ObjectDelete(0, "FM_P_ENTRY");
+          ObjectDelete(0, "FM_P_STOP");
+          ObjectDelete(0, "FM_P_TP");
          }
       // v2 MTF overlay (read-only annotation; never gates the state machine).
       if(InpMTFTrendTFMinutes > 0)
