@@ -242,12 +242,27 @@ int OnCalculate(const int rates_total,
       // Phases 1–5 run inside CFMAnalysis::Update (see Analysis.mqh).
        // Phase 6 runs inside CFMAnalysis::Update (see Analysis.mqh).
        // Phases 7–8 run inside CFMAnalysis::Update (see Analysis.mqh).
+       // Phase 4 parity: Decide on the REGISTRY selection (the same
+       // Select/SelectAuto output the EA trades off), not on the score-max
+       // best. SINGLE/MULTI/AUTO semantics therefore match the EA exactly.
+       Decision dec;
+       dec.action = DEC_NO_TRADE; dec.reason = REASON_NO_SETUP; dec.dir = 0;
+       dec.setupType = SETUP_NONE; dec.entry = 0; dec.stop = 0;
+       dec.objective = 0; dec.rMult = 0; dec.score = 0;
+       if(g_cfg.EnableDecision && res.decisionDone && g_parity.selection.hasTrade)
+          dec = CDecisionEngine::Decide(g_parity.selection.setup, res.dctx, res.atr, g_cfg);
+       else if(!g_cfg.EnableDecision)
+          dec.reason = REASON_DISABLED;
+       g_parity.decision = dec;
        // Adapter below: FM_DECISION label + LTF confirm (read-only).
-       Decision dec = res.decision;
        if(g_cfg.EnableDecision && res.decisionDone)
          {
           color dc=(dec.action==DEC_BUY?clrLime:(dec.action==DEC_SELL?clrRed:(dec.action==DEC_WAIT?clrOrange:clrGray)));
-          string dtxt=StringFormat("%s %s",CDecisionEngine::ActionName(dec.action),CDecisionEngine::ReasonName(dec.reason));
+          string stratTxt = CStrategyRegistry::StrategyName(g_parity.selection.strategy);
+          string modeTxt = CStrategyRegistry::ModeName(InpStratMode);
+          string finTxt = ((InpStratMode == STRAT_MODE_AUTO && g_parity.autoFinal >= 0)
+                           ? StringFormat(" f=%d", g_parity.autoFinal) : "");
+          string dtxt=StringFormat("%s %s %s %s%s",CDecisionEngine::ActionName(dec.action),CDecisionEngine::ReasonName(dec.reason),modeTxt,stratTxt,finTxt);
           if(ObjectFind(0,"FM_DECISION")<0) ObjectCreate(0,"FM_DECISION",OBJ_TEXT,0,time[1],close[1]);
           ObjectSetString(0,"FM_DECISION",OBJPROP_TEXT,dtxt);
           ObjectSetInteger(0,"FM_DECISION",OBJPROP_COLOR,dc);
