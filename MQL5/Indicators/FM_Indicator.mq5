@@ -79,6 +79,8 @@ input int                InpMaxHoldBars         = 5;     // intent max-hold proj
 input bool               InpDiagnosticMode      = false; // Phase 6: verbose per-bar parity dashboard (DEBUG)
 input bool               InpShowParityLabel     = true;  // Phase 6: FM_PARITY detail label (WAIT-visible)
 input bool               InpShowParityLevels    = false; // Phase 6: selection entry/SL/TP lines
+input bool               InpExportParityCSV     = false; // Phase 7: per-bar parity row (BAR,signals,strategy,...)
+input string             InpParityCSVFile       = "FM_parity.csv";
 
 //--- buffers
 double BufTarget[];
@@ -197,6 +199,30 @@ void ExportSignalRow(datetime bt, const CFMSetup &s, double px, int score)
    FileWrite(h, TimeToString(bt, TIME_DATE|TIME_SECONDS), s.id, (int)s.family,
              s.dir, DoubleToString(s.target, _Digits), DoubleToString(px, _Digits),
              score, _Symbol, EnumToString((ENUM_TIMEFRAMES)_Period));
+   FileClose(h);
+  }
+
+// Phase 7 parity CSV: one machine-readable row per closed bar for the
+// EA↔Indicator comparator (tests/parity_compare.py). Column contract is
+// normative — the Python HEADER must list these exact names in this order:
+// bar,ind_signal,ind_why,mode,strategy,score,r_mult,auto_final,veto,intent,dec_action,dec_reason
+void ExportParityRow(datetime bt, string finAct, string finWhy, const Decision &ddc)
+  {
+   int h = FileOpen(InpParityCSVFile, FILE_CSV|FILE_READ|FILE_WRITE, ',');
+   if(h == INVALID_HANDLE) return;
+   FileSeek(h, 0, SEEK_END);
+   if(FileSize(h) == 0)
+      FileWrite(h, "bar", "ind_signal", "ind_why", "mode", "strategy", "score",
+                "r_mult", "auto_final", "veto", "intent", "dec_action", "dec_reason");
+   FileWrite(h, TimeToString(bt, TIME_DATE|TIME_SECONDS), finAct, finWhy,
+             CStrategyRegistry::ModeName(InpStratMode),
+             CStrategyRegistry::StrategyName(g_parity.selection.strategy),
+             (g_parity.selection.hasTrade ? g_parity.selection.setup.score : -1),
+             DoubleToString((g_parity.selection.hasTrade ? g_parity.selection.setup.rMult : 0.0), 4),
+             g_parity.autoFinal,
+             (g_parity.vetoWhy == "" ? "-" : g_parity.vetoWhy),
+             (g_parity.intentWhy == "" ? "-" : g_parity.intentWhy),
+             CDecisionEngine::ActionName(ddc.action), CDecisionEngine::ReasonName(ddc.reason));
    FileClose(h);
   }
 
@@ -415,6 +441,9 @@ int OnCalculate(const int rates_total,
              ObjectDelete(0, "FM_P_STOP");
              ObjectDelete(0, "FM_P_TP");
             }
+          // Phase 7: machine-readable parity row (closed-bar only).
+          if(InpExportParityCSV)
+             ExportParityRow(time[1], finAct, finWhy, dec);
          }
        else
          {
