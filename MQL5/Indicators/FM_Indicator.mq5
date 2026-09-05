@@ -48,8 +48,30 @@
 #include <FM/Analysis.mqh>
 #include <FM/Visualizer.mqh>
 #include <FM/Alerts.mqh>
+#include <FM/StrategyRegistry.mqh>  // Phase 1: parity — mode/single/enable/AUTO types + registry
 
 #include <FM/Inputs.mqh>     // Phase 23: shared analysis inputs (verbatim)
+
+//--- parity inputs (Phase 1: decision-affecting EA selection inputs mirrored
+//--- with IDENTICAL defaults; see FM_EA.mq5:27-34,62-71. NOT in Inputs.mqh:
+//--- that file is shared verbatim, and the EA already defines these inputs —
+//--- duplicating them there would break the EA build with redefinitions.
+//--- .set presets bind by NAME, so EA presets drive these too.)
+input ENUM_STRATEGY_MODE InpStratMode       = STRAT_MODE_AUTO;
+input ENUM_FM_STRATEGY   InpSingleStrategy  = STRAT_FM_FADE;
+input bool               InpUseFM           = true;
+input bool               InpUsePullback     = true;
+input bool               InpUseBreakout     = true;
+input bool               InpUseReversal     = true;
+input bool               InpUseDouble       = true;
+input bool               InpUseFailedBO     = true;
+input int                InpAutoTrendBonus  = 10;
+input int                InpAutoProvPenalty = 5;
+input int                InpAutoRRBonus     = 5;
+input double             InpAutoRRLevel     = 2.0;
+input bool               InpApplyStructuralVeto = true;  // EXP-0002 apparatus
+input bool               InpTradeProvisional    = false; // intent gate (Phase 5)
+input double             InpChaseATRMult        = 0.50;  // intent chase (Phase 5)
 
 //--- buffers
 double BufTarget[];
@@ -66,6 +88,7 @@ CMarketData    g_md;
 CFMAnalysis    g_analysis;   // Phase 21: shared contract (owns ATR/swings/engine)
 CVisualizer    g_viz;
 CAlertManager  g_alerts;
+CStrategyRegistry g_registry; // Phase 1: parity — configured, selection wired in Phase 4
 datetime       g_last_closed_time = 0;
 bool           g_first_run = true;
 
@@ -76,6 +99,11 @@ int OnInit()
    ApplyInputsToConfig();
    g_log.SetLevel(g_cfg.LogLevel);
    g_analysis.Setup(g_cfg, GetPointer(g_log));
+   // Phase 1 parity: same registry configuration call as FM_EA.mq5:101-103.
+   // Selection itself is wired in Phase 4; analysis path unchanged (byte-identical).
+   g_registry.Configure(InpStratMode, InpSingleStrategy,
+                        InpUseFM, InpUsePullback, InpUseBreakout,
+                        InpUseReversal, InpUseDouble, InpUseFailedBO);
 
    SetIndexBuffer(0, BufTarget, INDICATOR_DATA);
    SetIndexBuffer(1, BufPotential, INDICATOR_DATA);
