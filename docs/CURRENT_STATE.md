@@ -1,5 +1,15 @@
 # CURRENT STATE — Phase-20 audit (2026-09-04, HEAD `7009511`)
 
+> UPDATE 2026-09-05 (parity project Phases 0–8): this snapshot is preserved
+> verbatim below for history. Current state: the EA now lives IN this repo
+> (`MQL5/Experts/FM_EA.mq5` + registry/risk/intent/safety layers — it arrived
+> via Phases 21–35 before the parity work), and the indicator is now its
+> decision mirror (shared `CFMAnalysis` + `CStrategyRegistry` +
+> `CParityBuilder`, veto/intent parity, diagnostics, parity harness).
+> See `docs/INDICATOR_EA_PARITY_AUDIT.md`, `docs/INDICATOR_REFERENCE.md`,
+> `docs/EA_INDICATOR_PARITY_TESTING.md`, `docs/CHANGELOG.md`.
+> The "No EA exists" statements below are superseded.
+
 > Verified by inspection this session (git + SHA256 + re-run tests + agent
 > logs). Nothing below is carried over on trust. Labels per project rule:
 > UNIT TEST vs MT5 BACKTEST vs NOT TESTED.

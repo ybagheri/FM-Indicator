@@ -1,6 +1,13 @@
 # FM-Indicator — Fading Measured Moves (Al Brooks Price Action) for MT5
 
-Systematic, configurable, testable MQL5 indicator (v1.30) that projects
+Systematic, configurable, testable MQL5 indicator + Expert Advisor sharing one
+decision engine. The indicator (`MQL5/Indicators/FM_Indicator.mq5`) is a
+non-trading visualization and decision mirror of the EA
+(`MQL5/Experts/FM_EA.mq5`): same analysis, same strategy registry
+(FM_FADE, PULLBACK, BREAKOUT, REVERSAL_MTR, DOUBLE, FAILED_BO), same
+SINGLE/MULTI/AUTO selection, same structural veto, same risk/intent gating —
+see `docs/INDICATOR_EA_PARITY_AUDIT.md` and `docs/INDICATOR_REFERENCE.md`.
+The indicator core projects
 **Leg1=Leg2 (AB=CD)** measured moves plus three v1.2 families — **range-height
 breakout**, **shallow-pullback channel**, **measuring gap** — plus optional
 **failed-breakout inverse-MM**, and detects **Fading Measured Move** setups as
@@ -26,8 +33,13 @@ an explicit state machine:
 
 1. Copy `MQL5/Indicators/FM_Indicator.mq5` → terminal `MQL5/Indicators/`.
 2. Copy `MQL5/Include/FM/*.mqh` → terminal `MQL5/Include/FM/`.
-3. Open MetaEditor, compile `FM_Indicator.mq5` (F7), attach to chart.
-4. No DLLs, no dependencies beyond the standard library.
+3. For the EA: copy `MQL5/Experts/FM_EA.mq5` → terminal `MQL5/Experts/`
+   (same `Include/FM/` tree; needs no other files).
+4. Open MetaEditor, compile `FM_Indicator.mq5` and `FM_EA.mq5` (F7).
+5. No DLLs, no dependencies beyond the standard library.
+6. Presets in `Presets/` bind inputs by name and load in both programs
+   (EA-only names are ignored by older indicator builds; new parity inputs
+   fall back to EA-identical defaults when absent from a `.set` file).
 
 ## Parameters (Balanced defaults; see SPEC §1)
 
@@ -122,11 +134,15 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 
 ## Status / next steps
 
-Implementation in this repo is complete (Phases 0–8 + v1/v1.1/v1.2/v2).
-What remains is validation and execution, in order — see
-`docs/FUTURE_ROADMAP.md` § "Next moves (ordered)": MetaEditor compile +
-Strategy Tester visual run → walk-forward review from exported CSVs → v3 EA
-in a separate repo. No further indicator features are planned here.
+EA/Indicator parity build (Phases 0–8, see `docs/CHANGELOG.md`): one shared
+analysis + registry + veto/intent pipeline consumed by both programs; the
+indicator's `FM_DECISION` label shows the EA-mirror final signal
+(`BUY`/`SELL` = the EA logs `WOULD_*`, `NO_TRADE` + reason otherwise) and
+`FM_PARITY` shows decision/veto/intent detail. What remains is live validation
+in order — see `docs/FUTURE_ROADMAP.md` § "Next moves (ordered)": MetaEditor
+compile + Strategy Tester visual run → EA↔Indicator parity comparison run
+(`docs/EA_INDICATOR_PARITY_TESTING.md` Workflow B) → walk-forward review from
+exported CSVs. No profitability claims; see roadmap before any live use.
 
 ## Docs
 
@@ -143,7 +159,9 @@ in a separate repo. No further indicator features are planned here.
 `docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/VALIDATION.md` ·
 `docs/LIMITATIONS.md` · `docs/CONFIGURATION.md` · `docs/USER_GUIDE.md` ·
 `docs/ROADMAP.md` · `docs/FUTURE_ROADMAP.md` · `docs/FM_ENGINE.md` ·
-`docs/SIGNAL_SCORING.md` · `docs/NON_REPAINTING.md`
+`docs/SIGNAL_SCORING.md` · `docs/NON_REPAINTING.md` ·
+`docs/INDICATOR_EA_PARITY_AUDIT.md` · `docs/INDICATOR_REFERENCE.md` ·
+`docs/EA_INDICATOR_PARITY_TESTING.md` · `docs/CHANGELOG.md`
 
 ## Self-critique
 

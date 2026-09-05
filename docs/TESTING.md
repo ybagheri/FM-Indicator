@@ -14,9 +14,19 @@
 - Decision oracle: `tests/decision.py` (1:1 mirror of DECISION_ENGINE.md).
 - LTF oracle: `ltf_bias` + `ltf_confirm` in `tests/fm_engine.py` (mirror of
   MARKET_CONTEXT.md §5; same SMA-gap math as `mtf_bias` via shared helper).
-- Run: `python3 -m pytest tests/ -q` → 97 tests, ALL PASS (19 FM + 7 bar +
+- Run: `python3 -m pytest tests/ -q` (or per-file via `__main__`;
+  this env runs `python tests/test_*.py` directly — no pytest in the embedded
+  interpreter) → engine suites ALL PASS (19 FM + 7 bar +
   10 pullback + 9 state + 9 breakout + 10 reversal + 10 setup + 10 general +
   10 decision + 3 LTF; or per-file via `__main__`).
+- Parity oracles (Phases 3/5/7): `tests/parity_decision.py` (mirror of
+  `ParityDecision.mqh` builder + veto + final-signal pipeline),
+  `tests/test_parity_build.py` (builder == legacy select/select_auto over 300
+  randomized trials × modes), `tests/test_parity_final.py` (spec cases A–G),
+  `tests/parity_compare.py` + `tests/test_parity_harness.py` (case H
+  determinism/append-stability, case I tuning/mask sensitivity, CSV contract,
+  EA-log parser, comparator). Full method in
+  `docs/EA_INDICATOR_PARITY_TESTING.md`.
 - MQL5 compile: MetaEditor on Windows (F7). Linux env has no
   `metaeditor.exe`/`wine`; static check = balanced-delimiter scan
   (comment/string-stripped) over all 21 MQL5 files → OK.
