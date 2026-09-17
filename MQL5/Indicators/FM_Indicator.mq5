@@ -52,6 +52,7 @@
 #include <FM/ParityDecision.mqh>    // Phase 3: parity — shared candidate/selection builder
 #include <FM/TradeIntent.mqh>       // Phase 5: parity — closed-bar intent projection
 
+input group "=== FM-Indicator Analysis Parameters (shared engine — includes v1.3 session-MM Session* inputs) ==="
 #include <FM/Inputs.mqh>     // Phase 23: shared analysis inputs (verbatim)
 
 //--- parity inputs (Phase 1: decision-affecting EA selection inputs mirrored

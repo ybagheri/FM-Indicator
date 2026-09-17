@@ -31,3 +31,34 @@ replay). Mirror: `tests/risk_manager.py`.
 Stop-level distance + margin + quotes are EXECUTION gates (Phase 25, need
 live prices), not risk gates. Risk assumes structural stops; execution
 refuses unplaceable ones (`INVALID_STOPS`, `NO_MONEY`).
+
+## 5. MM-percentage sizing (`CMMRiskModel`, v1.3, `MMRiskModel.mqh`)
+
+EA-side-only optional alternative sizing path, kept outside `Config.mqh` /
+`Inputs.mqh` on purpose — same reasoning as `CRiskManager` itself: position
+sizing is an execution concern, not an analysis-engine one. Use this when a
+setup's stop/target should scale off the *Measured-Move size itself*
+(`Projection.mm_range`) rather than off an ATR buffer.
+
+- Two RR modes off the same MM size, `ENUM_MM_RR_MODE`:
+  - `MM_RR_EQUAL` (1:1): stop = 66% of MM size, target = same distance.
+  - `MM_RR_DOUBLE` (1:2): stop = 33% of MM size, target = 2× that distance.
+- Stop distance is always floored at a caller-supplied `minFloorPoints`
+  (500 by default per the original spec) so an early/small MM projection
+  never produces an unrealistically tight stop.
+- `ComputeLotByRiskPercent(symbol, slPoints, riskPercent, riskMoney)`: manual
+  `contractSize` / `tickSize` / `tickValue` formula — `riskMoney = balance ×
+  pct/100`; `lots = riskMoney / (slPoints × point / tickSize × tickValue)`.
+  `contractSize` itself isn't part of the formula (tick value already folds
+  it in per MT5 docs) — fetched only for logging/sanity-checking.
+- `BuildOrderPlan(symbol, entry, dir, mmRangePrice, mode, minFloorPoints,
+  riskPercent, ...)` chains both steps: MM size → stop/target prices → sized
+  lot, in one call.
+- Prefer `CRiskManager::ComputeVolume` (§1, `OrderCalcProfit`-based) instead
+  whenever both entry AND stop PRICES already exist — it additionally
+  adjusts for non-linear `SYMBOL_TRADE_CALC_MODE` symbols. `CMMRiskModel` is
+  for the earlier moment: only a stop *distance in points* is known yet
+  (right after `ComputeStopTargetPoints`, before an entry price is chosen).
+- No tests yet (unlike §1's `tests/risk_manager.py`) — add
+  `tests/mm_risk_model.py` before wiring this into a live EA's execution
+  path.

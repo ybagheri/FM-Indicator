@@ -7,6 +7,7 @@
 #include "Config.mqh"
 #include "Confirmation.mqh"
 #include "MeasuredMove.mqh"
+#include "SessionMeasuredMove.mqh"
 #include "Context.mqh"
 #include "Logger.mqh"
 
@@ -188,6 +189,21 @@ public:
             Projection p;
             if(CInverseMMHelper::TryInverse(rates, count, leg, cfg, aref, p))
                if(!SameProjection(p)) AddProjection(p, tnow);
+           }
+        }
+      // v1.3: pre-open session-range dual (up+down) projection — fires at
+      // most once per calendar day, at/after cfg.SessionCutoffHour:Min.
+      if(cfg.EnableSessionMM)
+        {
+         double aref = atr.At(1);
+         if(aref > 0)
+           {
+            Projection pUp, pDn;
+            if(CSessionRangeMM::ProjectPair(rates, count, cfg, aref, pUp, pDn))
+              {
+               if(pUp.valid && !SameProjection(pUp)) AddProjection(pUp, tnow);
+               if(pDn.valid && !SameProjection(pDn)) AddProjection(pDn, tnow);
+              }
            }
         }
       EvictIfNeeded(cfg, rates, count);

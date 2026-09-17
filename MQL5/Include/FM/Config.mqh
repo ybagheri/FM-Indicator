@@ -31,6 +31,14 @@ public:
    bool              EnableChannelMM;
    bool              EnableGapMM;
    double            MinGapATRMult;
+   // v1.3: pre-open session-range dual projection (docs/SESSION_MM.md §1)
+   bool              EnableSessionMM;
+   int               SessionStartHour;   // broker/server time, session window start
+   int               SessionStartMin;
+   int               SessionCutoffHour;  // broker/server time, e.g. cash-open time
+   int               SessionCutoffMin;
+   int               SessionMinBars;     // min bars required inside the window
+   int               SessionMaxBars;     // scan cap (safety bound)
    // v1.2 exhaustion: min consecutive pushes + wedge as first-class inputs
    int               MinPushes;
    bool              UseWedgeExhaustion;
@@ -116,6 +124,10 @@ public:
       EnableInverseMM=true; FailedBOBars=5;
       EnableRangeMM=false; RangeLookback=50;
       EnableChannelMM=false; EnableGapMM=false; MinGapATRMult=1.0;
+      EnableSessionMM=false;
+      SessionStartHour=18; SessionStartMin=0;   // Globex open (adjust to broker server time)
+      SessionCutoffHour=9; SessionCutoffMin=30; // US cash open (adjust to broker server time)
+      SessionMinBars=5; SessionMaxBars=400;
       MinPushes=3; UseWedgeExhaustion=true; ShowScore=true;
       DojiMaxBodyRatio=0.15; BigBarATRMult=2.0; SmallBarATRMult=0.5;
        StrongClosePct=0.70; OverlapRatio=0.50; BarbwireBars=5;
@@ -184,6 +196,18 @@ public:
       if(RangeLookback<10) { RangeLookback=10; ok=false; }
       if(RangeLookback>200) { RangeLookback=200; ok=false; }
       if(MinGapATRMult<0.25) { MinGapATRMult=0.25; ok=false; }
+      if(SessionStartHour<0) { SessionStartHour=0; ok=false; }
+      if(SessionStartHour>23) { SessionStartHour=23; ok=false; }
+      if(SessionStartMin<0) { SessionStartMin=0; ok=false; }
+      if(SessionStartMin>59) { SessionStartMin=59; ok=false; }
+      if(SessionCutoffHour<0) { SessionCutoffHour=0; ok=false; }
+      if(SessionCutoffHour>23) { SessionCutoffHour=23; ok=false; }
+      if(SessionCutoffMin<0) { SessionCutoffMin=0; ok=false; }
+      if(SessionCutoffMin>59) { SessionCutoffMin=59; ok=false; }
+      if(SessionMinBars<2) { SessionMinBars=2; ok=false; }
+      if(SessionMinBars>50) { SessionMinBars=50; ok=false; }
+      if(SessionMaxBars<SessionMinBars) { SessionMaxBars=SessionMinBars; ok=false; }
+      if(SessionMaxBars>2000) { SessionMaxBars=2000; ok=false; }
       if(MinPushes<2) { MinPushes=2; ok=false; }
       if(MinPushes>5) { MinPushes=5; ok=false; }
       if(DojiMaxBodyRatio<0.05) { DojiMaxBodyRatio=0.05; ok=false; }

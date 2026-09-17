@@ -16,12 +16,14 @@
 #include <FM/StrategyRegistry.mqh>
 #include <FM/ParityDecision.mqh> // Phase 3: shared candidate/selection builder
 #include <FM/RiskManager.mqh>
+#include <FM/MMRiskModel.mqh>      // v1.3: optional MM-% stop/target override
 #include <FM/ExecutionEngine.mqh>  // Phase 25: constructed+configured, no calls yet
 #include <FM/PositionManager.mqh>  // Phase 26: manage/BE/trail owned positions
 #include <FM/TradeIntent.mqh>      // Phase 27+: selection → trade intent
 #include <FM/TradeExplanation.mqh> // Phase 32: explainable decisions
 #include <FM/SafetyManager.mqh>    // Phase 33: modes + kill-switches
 #include <FM/PaperTrader.mqh>      // Phase 33: virtual fills
+input group "=== FM-Indicator Analysis Parameters (shared engine — includes v1.3 session-MM Session* inputs) ==="
 #include <FM/Inputs.mqh>       // shared analysis inputs (verbatim)
 
 //--- EA inputs (Phase 23: selection + identity only; trading inputs later)
@@ -47,6 +49,15 @@ input int                InpMaxPerSymbol   = 1;     // 0=off
 input int                InpMaxConsecLoss  = 3;     // 0=off
 input int                InpMaxSpreadPts   = 50;    // points, 0=off
 input double             InpRiskMinRR      = 1.0;   // 0=off
+//--- v1.3: optional MM-percentage stop/target override (default OFF — when
+// off, nothing below changes vs. the existing ATR-buffer stop/target; when
+// on, sel.setup.stop/objective are overwritten from the winning setup's raw
+// MM range BEFORE g_risk.Check()/g_intent.From*(), so the existing tested
+// RISK_PCT/OrderCalcProfit sizing (§1) still does the actual lot math off
+// whatever stop this override chose. See docs/RISK_MANAGEMENT.md §5.
+input bool               InpUseMMSizing    = false;
+input ENUM_MM_RR_MODE    InpMMRRMode       = MM_RR_DOUBLE;
+input double             InpMMMinStopPoints = 500.0;
 //--- execution inputs (Phase 25: configured only; orders need Phase 33 mode)
 input int                InpSlippagePts    = 10;
 //--- position inputs (Phase 26; strategy-permits refined in Phases 27-30)
@@ -204,6 +215,48 @@ double OnTester()
    return score;
   }
 
+// v1.3: optional opt-in override — when InpUseMMSizing is true, replaces
+// the winning setup's ATR-buffer stop/objective with a stop/target sized
+// as a % of the ORIGINAL Measured-Move size (docs/RISK_MANAGEMENT.md §5,
+// docs/SESSION_MM.md §4). No new struct fields: mm_range is re-derived from
+// the matching active FM setup snapshot's a0/a1 prices (|a1-a0|), found by
+// matching dir + the b0/objective price — both are copied verbatim through
+// SetupPlan/GeneralSetup with no transformation, so this match is exact,
+// not a heuristic. Returns false (leaves s untouched) if disabled, if no
+// snapshot matches, or if the strategy isn't a raw-MM family (dir/objective
+// pairs from FAILED_BO/PULLBACK/BREAKOUT/REVERSAL/DOUBLE simply won't find
+// a match here and pass through unchanged).
+bool ApplyMMSizingOverride(GeneralSetup &s)
+  {
+   if(!InpUseMMSizing || !s.valid) return false;
+
+   FMSetupSnapshot snaps[];
+   int n = g_analysis.EnginePtr().ActiveSnapshots(snaps);
+   int best = -1;
+   for(int i = 0; i < n; i++)
+     {
+      if(snaps[i].dir != s.dir) continue;
+      if(MathAbs(snaps[i].b0_price - s.objective) > _Point * 2) continue;
+      best = i;
+      break;
+     }
+   if(best < 0) return false;
+
+   double mmRangePrice = MathAbs(snaps[best].a1_price - snaps[best].a0_price);
+   if(mmRangePrice <= 0) return false;
+
+   double mmRangePoints = mmRangePrice / _Point;
+   double slPoints = 0.0, tpPoints = 0.0;
+   CMMRiskModel::ComputeStopTargetPoints(mmRangePoints, InpMMRRMode, InpMMMinStopPoints, slPoints, tpPoints);
+
+   s.stop      = s.entry - s.dir * slPoints * _Point;
+   s.objective = s.entry + s.dir * tpPoints * _Point;
+   s.riskPts   = slPoints * _Point;
+   s.rewardPts = tpPoints * _Point;
+   s.rMult     = (s.riskPts > 0 ? s.rewardPts / s.riskPts : 0.0);
+   return true;
+  }
+
 void OnTick()
   {
    datetime bt0 = iTime(_Symbol, _Period, 0);
@@ -290,6 +343,8 @@ void OnTick()
    int n = pd.candCount;
    StrategySelection sel = pd.selection;
    int autoFinal = pd.autoFinal;
+   if(sel.hasTrade)
+      ApplyMMSizingOverride(sel.setup); // v1.3: no-op unless InpUseMMSizing=true
    // Phase 31: Phase-8 structural vetoes apply in ALL modes.
    // EXP-0002 apparatus: InpApplyStructuralVeto=false counts vetoes but
    // proceeds (vetoWhy retained for alternate tagging + bypass log).

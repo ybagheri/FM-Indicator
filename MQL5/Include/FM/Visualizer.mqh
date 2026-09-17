@@ -88,7 +88,7 @@ public:
           // Explicit fade direction: bull MM fades SHORT, bear MM fades LONG.
           string side = (s.dir > 0 ? "SELL" : "BUY");
           string st = (s.state==FM_PROJECTED?"MM":(s.state==FM_POTENTIAL?"POTENTIAL":(s.state==FM_DEVELOPING?"DEVELOPING":(s.state==FM_CONFIRMED?"CONFIRMED":"DONE"))));
-          string fam = (s.family==MM_INVERSE ? "INV " : (s.family==MM_RANGE ? "RNG " : (s.family==MM_CHANNEL ? "CH " : (s.family==MM_GAP ? "GAP " : ""))));
+          string fam = (s.family==MM_INVERSE ? "INV " : (s.family==MM_RANGE ? "RNG " : (s.family==MM_CHANNEL ? "CH " : (s.family==MM_GAP ? "GAP " : (s.family==MM_SESSION ? "SESN " : "")))));
           // v1.2 display-only score S=0..100 (never trades).
           string sc = "";
           if(cfg.ShowScore && count > 3 && atr_ref > 0)

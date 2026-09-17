@@ -32,6 +32,13 @@ input int    InpRangeLookback       = 50;
 input bool   InpEnableChannelMM     = false;  // v1.2 shallow-pullback channel family
 input bool   InpEnableGapMM         = false;  // v1.2 measuring-gap family
 input double InpMinGapATRMult       = 1.0;
+input bool   InpEnableSessionMM     = false;  // v1.3 pre-open session-range dual projection
+input int    InpSessionStartHour    = 18;     // broker/server time — session window start
+input int    InpSessionStartMin     = 0;
+input int    InpSessionCutoffHour   = 9;      // broker/server time — e.g. US cash-open
+input int    InpSessionCutoffMin    = 30;
+input int    InpSessionMinBars      = 5;      // min bars required inside the window
+input int    InpSessionMaxBars      = 400;    // scan cap (safety bound)
 input int    InpMinPushes           = 3;      // v1.2 exhaustion push threshold 2..5
 input bool   InpUseWedgeExhaustion  = true;
 input bool   InpShowScore           = true;   // v1.2 display-only S=0..100
@@ -109,6 +116,10 @@ void FM_ApplyInputs(CFMConfig &cfg)
    cfg.EnableRangeMM=InpEnableRangeMM; cfg.RangeLookback=InpRangeLookback;
    cfg.EnableChannelMM=InpEnableChannelMM; cfg.EnableGapMM=InpEnableGapMM;
    cfg.MinGapATRMult=InpMinGapATRMult;
+   cfg.EnableSessionMM=InpEnableSessionMM;
+   cfg.SessionStartHour=InpSessionStartHour; cfg.SessionStartMin=InpSessionStartMin;
+   cfg.SessionCutoffHour=InpSessionCutoffHour; cfg.SessionCutoffMin=InpSessionCutoffMin;
+   cfg.SessionMinBars=InpSessionMinBars; cfg.SessionMaxBars=InpSessionMaxBars;
    cfg.MinPushes=InpMinPushes; cfg.UseWedgeExhaustion=InpUseWedgeExhaustion;
    cfg.ShowScore=InpShowScore;
    cfg.DojiMaxBodyRatio=InpDojiMaxBodyRatio; cfg.BigBarATRMult=InpBigBarATRMult;
