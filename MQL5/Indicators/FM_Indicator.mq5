@@ -83,6 +83,45 @@ input bool               InpShowParityLevels    = false; // Phase 6: selection e
 input bool               InpExportParityCSV     = false; // Phase 7: per-bar parity row (BAR,signals,strategy,...)
 input string             InpParityCSVFile       = "FM_parity.csv";
 
+//--- v1.4: risk / position-size panel (display-only — this indicator never
+//--- places an order; it only shows what a trader COULD do). See
+//--- docs/RISK_PANEL.md for the full spec this implements.
+enum ENUM_RISK_TYPE
+  {
+   RISK_TYPE_PERCENT = 0, // risk = % of account balance
+   RISK_TYPE_DOLLAR  = 1  // risk = fixed account-currency amount
+  };
+enum ENUM_RISK_PCT_PRESET
+  {
+   RISK_PCT_1_00    = 0,
+   RISK_PCT_0_50    = 1,
+   RISK_PCT_0_25    = 2,
+   RISK_PCT_CUSTOM  = 3  // use InpRiskPercentCustom
+  };
+enum ENUM_RISK_USD_PRESET
+  {
+   RISK_USD_100     = 0,
+   RISK_USD_500     = 1,
+   RISK_USD_1000    = 2,
+   RISK_USD_CUSTOM  = 3  // use InpRiskDollarCustom
+  };
+
+input group "=== Risk / Position-Size Panel (display-only — never trades) ==="
+input bool                 InpShowRiskPanel        = true;
+input ENUM_RISK_TYPE       InpRiskType             = RISK_TYPE_PERCENT;
+input ENUM_RISK_PCT_PRESET InpRiskPercentPreset    = RISK_PCT_1_00;
+input double                InpRiskPercentCustom    = 1.0;    // used when preset = CUSTOM
+input ENUM_RISK_USD_PRESET InpRiskDollarPreset     = RISK_USD_100;
+input double                InpRiskDollarCustom     = 100.0;  // used when preset = CUSTOM
+input bool                  InpAutoDetectCommission = true;   // try recent closed deals on this symbol first
+input double                InpCommissionPerLot     = 6.0;    // manual/fallback, account ccy, round-turn per lot
+input string                InpMMRatiosString       = "25,33,50,66"; // stop-loss = this % of the active setup's raw MM size
+input double                InpRiskPanelMinStopPoints = 500.0; // floor applied to every ratio row's stop distance
+input int                   InpRiskPanelXDistance   = 10;
+input int                   InpRiskPanelYDistance   = 20;
+input color                 InpRiskPanelColor       = clrWhite;
+input int                   InpRiskPanelFontSize    = 9;
+
 //--- buffers
 double BufTarget[];
 double BufPotential[];
@@ -146,6 +185,246 @@ int OnInit()
 void OnDeinit(const int reason)
   {
    g_viz.DeleteAll();
+   ObjectDelete(0, RISK_PANEL_NAME);
+  }
+
+//+------------------------------------------------------------------+
+//| v1.4 Risk / position-size panel — display-only helpers            |
+//+------------------------------------------------------------------+
+string RISK_PANEL_NAME = "FM_RiskPanel";
+
+double ResolveRiskPercent()
+  {
+   switch(InpRiskPercentPreset)
+     {
+      case RISK_PCT_1_00: return 1.00;
+      case RISK_PCT_0_50: return 0.50;
+      case RISK_PCT_0_25: return 0.25;
+      default:            return InpRiskPercentCustom;
+     }
+  }
+
+double ResolveRiskDollar()
+  {
+   switch(InpRiskDollarPreset)
+     {
+      case RISK_USD_100:  return 100.0;
+      case RISK_USD_500:  return 500.0;
+      case RISK_USD_1000: return 1000.0;
+      default:             return InpRiskDollarCustom;
+     }
+  }
+
+double GetRiskMoney()
+  {
+   if(InpRiskType == RISK_TYPE_PERCENT)
+      return AccountInfoDouble(ACCOUNT_BALANCE) * ResolveRiskPercent() / 100.0;
+   return ResolveRiskDollar();
+  }
+
+// Best-effort estimate from recent closed deals on this symbol: sums
+// |commission| and volume over the most recent matching deals and returns
+// their ratio. Approximate by nature (brokers split round-turn commission
+// across entry/exit deals differently) — sanity-check against your account
+// statement. Returns false (caller falls back to InpCommissionPerLot) if
+// there is no matching history yet.
+bool AutoDetectCommissionPerLot(double &commissionPerLot)
+  {
+   commissionPerLot = 0.0;
+   if(!HistorySelect(0, TimeCurrent()))
+      return false;
+   int total = HistoryDealsTotal();
+   double sumComm = 0.0, sumVol = 0.0;
+   int used = 0;
+   for(int i = total - 1; i >= 0 && used < 20; i--)
+     {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket == 0) continue;
+      if(HistoryDealGetString(ticket, DEAL_SYMBOL) != _Symbol) continue;
+      double comm = HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+      double vol  = HistoryDealGetDouble(ticket, DEAL_VOLUME);
+      if(vol <= 0.0 || comm == 0.0) continue;
+      sumComm += MathAbs(comm);
+      sumVol  += vol;
+      used++;
+     }
+   if(sumVol <= 0.0) return false;
+   commissionPerLot = sumComm / sumVol;
+   return true;
+  }
+
+double GetEffectiveCommission(bool &wasAutoDetected)
+  {
+   double detected;
+   if(InpAutoDetectCommission && AutoDetectCommissionPerLot(detected) && detected > 0.0)
+     {
+      wasAutoDetected = true;
+      return detected;
+     }
+   wasAutoDetected = false;
+   return InpCommissionPerLot;
+  }
+
+void ParseMMRatios(double &out[])
+  {
+   ArrayFree(out);
+   string parts[];
+   int n = StringSplit(InpMMRatiosString, ',', parts);
+   if(n <= 0)
+     {
+      ArrayResize(out, 1);
+      out[0] = 0.66;
+      return;
+     }
+   ArrayResize(out, n);
+   for(int i = 0; i < n; i++)
+      out[i] = MathMax(0.0, StringToDouble(parts[i])) / 100.0; // "66" -> 0.66
+  }
+
+int MMStateRank(ENUM_FM_STATE st)
+  {
+   switch(st)
+     {
+      case FM_CONFIRMED:  return 4;
+      case FM_DEVELOPING: return 3;
+      case FM_POTENTIAL:  return 2;
+      case FM_PROJECTED:  return 1;
+      default:             return 0;
+     }
+  }
+
+// Picks the single most-relevant active MM/FM setup to drive the panel:
+// most-advanced state first (CONFIRMED > DEVELOPING > POTENTIAL >
+// PROJECTED), ties broken by whichever is currently closest to its target.
+bool GetPrimaryMMSetup(CFMEngine &eng, FMSetupSnapshot &best)
+  {
+   FMSetupSnapshot snaps[];
+   int n = eng.ActiveSnapshots(snaps);
+   int bestRank = -1, bestIdx = -1;
+   double bestDist = DBL_MAX;
+   double px = (SymbolInfoDouble(_Symbol, SYMBOL_BID) + SymbolInfoDouble(_Symbol, SYMBOL_ASK)) / 2.0;
+   for(int i = 0; i < n; i++)
+     {
+      if(snaps[i].state == FM_INVALIDATED || snaps[i].state == FM_COMPLETED) continue;
+      int rank = MMStateRank(snaps[i].state);
+      double dist = MathAbs(px - snaps[i].target);
+      if(rank > bestRank || (rank == bestRank && dist < bestDist))
+        {
+         bestRank = rank; bestDist = dist; bestIdx = i;
+        }
+     }
+   if(bestIdx < 0) return false;
+   best = snaps[bestIdx];
+   return true;
+  }
+
+string MMFamilyLabel(ENUM_MM_FAMILY f)
+  {
+   switch(f)
+     {
+      case MM_INVERSE: return "INV ";
+      case MM_RANGE:   return "RNG ";
+      case MM_CHANNEL: return "CH ";
+      case MM_GAP:     return "GAP ";
+      case MM_SESSION: return "SESN ";
+      default:          return "";
+     }
+  }
+
+// stop distance = ratio x raw MM size (points), floored at
+// InpRiskPanelMinStopPoints; lot = riskMoney / (price-move cost + commission)
+// for that stop distance at 1.0 lot — commission included so the lot shown
+// already accounts for round-turn cost eating into the risk budget.
+void ComputeRatioRow(double mmRangePoints, double ratio, double minFloorPoints,
+                     double riskMoney, double commissionPerLot,
+                     double &stopPoints, double &lot)
+  {
+   stopPoints = mmRangePoints * ratio;
+   if(stopPoints < minFloorPoints) stopPoints = minFloorPoints;
+   lot = 0.0;
+
+   double tickSize  = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+   double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+   double point     = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   if(tickSize <= 0.0 || tickValue <= 0.0 || point <= 0.0 || riskMoney <= 0.0)
+      return;
+
+   double slPriceDistance = stopPoints * point;
+   double ticksInSL       = slPriceDistance / tickSize;
+   double moneyPerLotAtSL = ticksInSL * tickValue;
+   double costPerLot      = moneyPerLotAtSL + commissionPerLot;
+   if(costPerLot <= 0.0) return;
+
+   lot = riskMoney / costPerLot;
+
+   double minv = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double maxv = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   double step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   if(step <= 0.0) step = minv;
+   lot = MathFloor(lot / step + 1e-9) * step;
+   if(lot < minv) lot = minv;
+   if(lot > maxv) lot = maxv;
+   int vd = (step >= 1.0 ? 0 : (step >= 0.1 ? 1 : (step >= 0.01 ? 2 : 3)));
+   lot = NormalizeDouble(lot, vd);
+  }
+
+void UpdateRiskPanel(CFMEngine &eng)
+  {
+   if(!InpShowRiskPanel)
+     {
+      if(ObjectFind(0, RISK_PANEL_NAME) >= 0) ObjectDelete(0, RISK_PANEL_NAME);
+      return;
+     }
+
+   double riskMoney = GetRiskMoney();
+   bool commAuto = false;
+   double commission = GetEffectiveCommission(commAuto);
+
+   string riskLabel;
+   if(InpRiskType == RISK_TYPE_PERCENT)
+      riskLabel = StringFormat("Risk: %.2f%% ($%.2f)", ResolveRiskPercent(), riskMoney);
+   else
+      riskLabel = StringFormat("Risk: $%.2f", riskMoney);
+
+   string text = "FM Risk Panel\n" + riskLabel + "\n" +
+                 StringFormat("Commission: $%.2f/lot (%s)", commission, commAuto ? "auto" : "manual") + "\n";
+
+   FMSetupSnapshot best;
+   if(!GetPrimaryMMSetup(eng, best))
+     {
+      text += "No active MM setup";
+     }
+   else
+     {
+      double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      double mmRangePoints = (point > 0) ? MathAbs(best.a1_price - best.a0_price) / point : 0.0;
+      string fam  = MMFamilyLabel(best.family);
+      string side = (best.dir > 0 ? "SELL" : "BUY"); // bull MM fades short, bear MM fades long
+      text += StringFormat("Setup: %s%s #%d  MM=%.1f pts\n", fam, side, (int)best.id, mmRangePoints);
+      text += "Ratio  Stop(pts)   Lot\n";
+
+      double ratios[];
+      ParseMMRatios(ratios);
+      for(int i = 0; i < ArraySize(ratios); i++)
+        {
+         double stopPts, lot;
+         ComputeRatioRow(mmRangePoints, ratios[i], InpRiskPanelMinStopPoints, riskMoney, commission, stopPts, lot);
+         text += StringFormat("%3.0f%%    %7.0f    %.2f\n", ratios[i] * 100.0, stopPts, lot);
+        }
+     }
+
+   if(ObjectFind(0, RISK_PANEL_NAME) < 0)
+      ObjectCreate(0, RISK_PANEL_NAME, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_XDISTANCE, InpRiskPanelXDistance);
+   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_YDISTANCE, InpRiskPanelYDistance);
+   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_COLOR, InpRiskPanelColor);
+   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_FONTSIZE, InpRiskPanelFontSize);
+   ObjectSetString(0, RISK_PANEL_NAME, OBJPROP_FONT, "Consolas");
+   ObjectSetString(0, RISK_PANEL_NAME, OBJPROP_TEXT, text);
+   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_HIDDEN, true);
+   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_BACK, false);
   }
 
 // v2 MTF/LTF overlays (read-only): SMA20/50-gap bias on another timeframe.
@@ -501,6 +780,7 @@ int OnCalculate(const int rates_total,
             if(BufTarget[1]==EMPTY_VALUE) BufTarget[1]=s.target;
         }
       g_viz.Sync(rates, rates_total, *eng, g_cfg, atrNow);
+      UpdateRiskPanel(*eng); // v1.4: risk/position-size panel (display-only)
       g_first_run=false;
       return(rates_total);
      }
