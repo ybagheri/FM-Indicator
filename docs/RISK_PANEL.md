@@ -2,29 +2,37 @@
 
 > New, display-only addition to `FM_Indicator.mq5` — draws a top-left corner
 > panel showing a suggested stop distance and lot size for each of several
-> MM-size ratios, given a user-configured risk amount. **This indicator
-> still never places an order or computes anything the state machine
-> reads** — the panel is purely informational, same guarantee as the rest
-> of `FM_Indicator.mq5`.
+> MM-size ratios, for EVERY currently actionable MM/FM zone, given a
+> user-configured risk amount. **This indicator still never places an order
+> or computes anything the state machine reads** — the panel is purely
+> informational, same guarantee as the rest of `FM_Indicator.mq5`.
 
 ## 0. What it shows
 
 Once per closed bar, a single multi-line `OBJ_LABEL` at the chart's top-left
-corner (`FM_RiskPanel`) is redrawn with:
+corner (`FM_RiskPanel`) is redrawn with one block per active zone:
 
 ```
 FM Risk Panel
 Risk: 1.00% ($123.45)
 Commission: $6.00/lot (auto)
-Setup: SESN SELL #7  MM=250.0 pts
+
+SESN CONFIRMED SELL #7  MM=250.0 pts
 Ratio  Stop(pts)   Lot
  25%        500    2.15
  33%        500    1.63
  50%        750    1.09
  66%        990    0.82
+
+RNG DEVELOPING BUY #9  MM=180.0 pts
+Ratio  Stop(pts)   Lot
+ 25%        500    2.15
+ 33%        500    1.63
+ 50%        900    0.91
+ 66%       1188    0.69
 ```
 
-Each row answers: *"if I put my stop at this % of the active setup's raw
+Each row answers: *"if I put my stop at this % of that zone's raw
 Measured-Move size, how many points is that, and what lot size spends
 exactly my configured risk budget at that stop?"*
 
@@ -41,25 +49,34 @@ exactly my configured risk budget at that stop?"*
 | `InpAutoDetectCommission` | try recent closed-deal history on this symbol first |
 | `InpCommissionPerLot` | manual value, used when auto-detect is off or finds nothing |
 | `InpMMRatiosString` | comma list, percent-of-MM-size per row (default `"25,33,50,66"`) |
+| `InpRiskPanelMaxSetups` | cap on how many concurrent zones the panel lists (default 5) |
 | `InpRiskPanelMinStopPoints` | floor applied to every row's stop distance (default 500) |
 | `InpRiskPanelXDistance` / `YDistance` | panel position (pixels from top-left) |
 | `InpRiskPanelColor` / `FontSize` | panel styling |
 
-## 2. Which active setup drives the panel
+## 2. Which active zones drive the panel (`CollectMMSetupsForPanel`)
 
-The engine can have several active MM/FM setups at once (one per drawn zone).
-The panel picks exactly one — `GetPrimaryMMSetup()`:
+The engine can have several active MM/FM setups at once (one per drawn
+zone). The panel shows **every** zone that's actually reached, not just
+one:
 
-1. Highest state wins: `CONFIRMED > DEVELOPING > POTENTIAL > PROJECTED`
-   (`INVALIDATED`/`COMPLETED` are skipped).
-2. Ties broken by whichever is currently closest (mid-price) to its target.
+- Eligible states: `POTENTIAL`, `DEVELOPING`, `CONFIRMED` — a bare
+  `PROJECTED` target (just marked, price nowhere near it yet) is skipped,
+  since it isn't yet a real "buy or sell consideration". `INVALIDATED`/
+  `COMPLETED` are always skipped.
+- Sorted most-advanced-state first (`CONFIRMED > DEVELOPING > POTENTIAL`),
+  ties broken by whichever is currently closest (mid-price) to its target.
+- Capped at `InpRiskPanelMaxSetups` (default 5) so the panel can't grow
+  unboundedly when many zones are active at once — raise it if you want to
+  see more simultaneously.
 
-The raw MM size fed into the ratio table is **not** the setup's `objective`/
-`target` distance — it's the underlying leg/range height itself, re-derived
-as `|a1_price − a0_price|` from the same `FMSetupSnapshot` the engine already
-exposes (`CFMEngine::ActiveSnapshots`), converted to points. This is the
-same technique already used for `CMMRiskModel` in the `FM_Ilan_GridEA`/
-`FM_EA` EAs (`RISK_MANAGEMENT.md` §5) — no new struct fields needed.
+The raw MM size fed into each zone's ratio table is **not** the setup's
+`objective`/`target` distance — it's the underlying leg/range height
+itself, re-derived as `|a1_price − a0_price|` from the same
+`FMSetupSnapshot` the engine already exposes
+(`CFMEngine::ActiveSnapshots`), converted to points. Same technique already
+used for `CMMRiskModel` in the `FM_Ilan_GridEA`/`FM_EA` EAs
+(`RISK_MANAGEMENT.md` §5) — no new struct fields needed.
 
 ## 3. Commission auto-detection (`AutoDetectCommissionPerLot`)
 
@@ -72,7 +89,8 @@ and volume approximates the round-turn $/lot correctly in the common
 (symmetric) case, but sanity-check the auto-detected number against your
 account statement once. Falls back to `InpCommissionPerLot` if there is no
 matching history yet (fresh account/symbol) or `InpAutoDetectCommission` is
-off.
+off. This one number is shared across every zone's table (it's an account/
+symbol property, not per-setup).
 
 ## 4. Row math (`ComputeRatioRow`)
 
@@ -88,7 +106,9 @@ lot             = riskMoney / costPerLot          (then normalized to the
 
 Commission is included in the denominator on purpose — the lot shown already
 accounts for round-turn cost eating into the configured risk budget, not
-just the price-move loss at the stop.
+just the price-move loss at the stop. Every zone shown uses the *same*
+`riskMoney` — i.e. the panel answers "if I risked my full configured budget
+on THIS zone alone", not "split across all zones shown".
 
 ## 5. Known limitations
 
@@ -99,3 +119,6 @@ just the price-move loss at the stop.
   the signal/state-machine pipeline that parity testing covers).
 - `InpMMRatiosString` is not validated/clamped the way `Config.mqh` fields
   are — a malformed value falls back to a single 66% row.
+- Each zone's risk is computed independently at the full configured budget;
+  if you actually take more than one of the zones shown at once, your real
+  combined risk is the sum, not any single row.

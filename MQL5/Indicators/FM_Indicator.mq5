@@ -116,6 +116,7 @@ input double                InpRiskDollarCustom     = 100.0;  // used when prese
 input bool                  InpAutoDetectCommission = true;   // try recent closed deals on this symbol first
 input double                InpCommissionPerLot     = 6.0;    // manual/fallback, account ccy, round-turn per lot
 input string                InpMMRatiosString       = "25,33,50,66"; // stop-loss = this % of the active setup's raw MM size
+input int                   InpRiskPanelMaxSetups   = 5;      // cap on how many concurrent zones the panel lists
 input double                InpRiskPanelMinStopPoints = 500.0; // floor applied to every ratio row's stop distance
 input int                   InpRiskPanelXDistance   = 10;
 input int                   InpRiskPanelYDistance   = 20;
@@ -293,29 +294,47 @@ int MMStateRank(ENUM_FM_STATE st)
      }
   }
 
-// Picks the single most-relevant active MM/FM setup to drive the panel:
-// most-advanced state first (CONFIRMED > DEVELOPING > POTENTIAL >
-// PROJECTED), ties broken by whichever is currently closest to its target.
-bool GetPrimaryMMSetup(CFMEngine &eng, FMSetupSnapshot &best)
+// Collects every active MM/FM zone worth showing on the panel — i.e. one
+// price has actually approached (POTENTIAL/DEVELOPING/CONFIRMED); a bare
+// PROJECTED target (just marked, price nowhere near it yet) is skipped as
+// not yet a real "buy or sell consideration". Sorted most-advanced-state
+// first, ties broken by distance to target, capped at InpRiskPanelMaxSetups.
+int CollectMMSetupsForPanel(CFMEngine &eng, FMSetupSnapshot &out[])
   {
    FMSetupSnapshot snaps[];
    int n = eng.ActiveSnapshots(snaps);
-   int bestRank = -1, bestIdx = -1;
-   double bestDist = DBL_MAX;
    double px = (SymbolInfoDouble(_Symbol, SYMBOL_BID) + SymbolInfoDouble(_Symbol, SYMBOL_ASK)) / 2.0;
+
+   int    idx[];  double dist[];  int rank[];
+   ArrayResize(idx, n); ArrayResize(dist, n); ArrayResize(rank, n);
+   int m = 0;
    for(int i = 0; i < n; i++)
      {
-      if(snaps[i].state == FM_INVALIDATED || snaps[i].state == FM_COMPLETED) continue;
-      int rank = MMStateRank(snaps[i].state);
-      double dist = MathAbs(px - snaps[i].target);
-      if(rank > bestRank || (rank == bestRank && dist < bestDist))
-        {
-         bestRank = rank; bestDist = dist; bestIdx = i;
-        }
+      ENUM_FM_STATE st = snaps[i].state;
+      if(st != FM_POTENTIAL && st != FM_DEVELOPING && st != FM_CONFIRMED) continue;
+      idx[m] = i;
+      rank[m] = MMStateRank(st);
+      dist[m] = MathAbs(px - snaps[i].target);
+      m++;
      }
-   if(bestIdx < 0) return false;
-   best = snaps[bestIdx];
-   return true;
+
+   // insertion sort (m is small — at most InpMaxActiveSetups): rank desc, dist asc
+   for(int a = 1; a < m; a++)
+     {
+      int ci = idx[a], cr = rank[a]; double cd = dist[a];
+      int b = a - 1;
+      while(b >= 0 && (rank[b] < cr || (rank[b] == cr && dist[b] > cd)))
+        {
+         idx[b+1] = idx[b]; rank[b+1] = rank[b]; dist[b+1] = dist[b];
+         b--;
+        }
+      idx[b+1] = ci; rank[b+1] = cr; dist[b+1] = cd;
+     }
+
+   int shown = MathMin(m, InpRiskPanelMaxSetups);
+   ArrayResize(out, shown);
+   for(int i = 0; i < shown; i++) out[i] = snaps[idx[i]];
+   return shown;
   }
 
 string MMFamilyLabel(ENUM_MM_FAMILY f)
@@ -368,6 +387,17 @@ void ComputeRatioRow(double mmRangePoints, double ratio, double minFloorPoints,
    lot = NormalizeDouble(lot, vd);
   }
 
+string MMStateLabel(ENUM_FM_STATE st)
+  {
+   switch(st)
+     {
+      case FM_CONFIRMED:  return "CONFIRMED";
+      case FM_DEVELOPING: return "DEVELOPING";
+      case FM_POTENTIAL:  return "POTENTIAL";
+      default:             return "?";
+     }
+  }
+
 void UpdateRiskPanel(CFMEngine &eng)
   {
    if(!InpShowRiskPanel)
@@ -389,29 +419,36 @@ void UpdateRiskPanel(CFMEngine &eng)
    string text = "FM Risk Panel\n" + riskLabel + "\n" +
                  StringFormat("Commission: $%.2f/lot (%s)", commission, commAuto ? "auto" : "manual") + "\n";
 
-   FMSetupSnapshot best;
-   if(!GetPrimaryMMSetup(eng, best))
+   FMSetupSnapshot list[];
+   int shown = CollectMMSetupsForPanel(eng, list);
+   if(shown == 0)
      {
-      text += "No active MM setup";
+      text += "No active buy/sell zone in range yet";
      }
    else
      {
-      double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-      double mmRangePoints = (point > 0) ? MathAbs(best.a1_price - best.a0_price) / point : 0.0;
-      string fam  = MMFamilyLabel(best.family);
-      string side = (best.dir > 0 ? "SELL" : "BUY"); // bull MM fades short, bear MM fades long
-      text += StringFormat("Setup: %s%s #%d  MM=%.1f pts\n", fam, side, (int)best.id, mmRangePoints);
-      text += "Ratio  Stop(pts)   Lot\n";
-
       double ratios[];
       ParseMMRatios(ratios);
-      for(int i = 0; i < ArraySize(ratios); i++)
+      double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+
+      for(int k = 0; k < shown; k++)
         {
-         double stopPts, lot;
-         ComputeRatioRow(mmRangePoints, ratios[i], InpRiskPanelMinStopPoints, riskMoney, commission, stopPts, lot);
-         text += StringFormat("%3.0f%%    %7.0f    %.2f\n", ratios[i] * 100.0, stopPts, lot);
+         FMSetupSnapshot s = list[k];
+         double mmRangePoints = (point > 0) ? MathAbs(s.a1_price - s.a0_price) / point : 0.0;
+         string fam  = MMFamilyLabel(s.family);
+         string side = (s.dir > 0 ? "SELL" : "BUY"); // bull MM fades short, bear MM fades long
+         text += StringFormat("\n%s%s %s #%d  MM=%.1f pts\n", fam, MMStateLabel(s.state), side, (int)s.id, mmRangePoints);
+         text += "Ratio  Stop(pts)   Lot\n";
+
+         for(int i = 0; i < ArraySize(ratios); i++)
+           {
+            double stopPts, lot;
+            ComputeRatioRow(mmRangePoints, ratios[i], InpRiskPanelMinStopPoints, riskMoney, commission, stopPts, lot);
+            text += StringFormat("%3.0f%%    %7.0f    %.2f\n", ratios[i] * 100.0, stopPts, lot);
+           }
         }
      }
+
 
    if(ObjectFind(0, RISK_PANEL_NAME) < 0)
       ObjectCreate(0, RISK_PANEL_NAME, OBJ_LABEL, 0, 0, 0);
