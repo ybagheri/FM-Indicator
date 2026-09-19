@@ -107,7 +107,8 @@ enum ENUM_RISK_USD_PRESET
   };
 
 input group "=== Risk / Position-Size Panel (display-only — never trades) ==="
-input bool                 InpShowRiskPanel        = true;
+input bool                 InpShowRiskPanel        = true;   // top-left corner summary panel
+input bool                 InpShowZoneRiskTable    = true;   // Ratio/Stop/Lot rows drawn next to each zone's own box/line
 input ENUM_RISK_TYPE       InpRiskType             = RISK_TYPE_PERCENT;
 input ENUM_RISK_PCT_PRESET InpRiskPercentPreset    = RISK_PCT_1_00;
 input double                InpRiskPercentCustom    = 1.0;    // used when preset = CUSTOM
@@ -186,13 +187,13 @@ int OnInit()
 void OnDeinit(const int reason)
   {
    g_viz.DeleteAll();
-   ObjectDelete(0, RISK_PANEL_NAME);
+   DeleteObjectsByPrefix("FM_RPRow");
+   DeleteObjectsByPrefix("FM_RZ_");
   }
 
 //+------------------------------------------------------------------+
-//| v1.4 Risk / position-size panel — display-only helpers            |
+//| v1.4/v1.5 Risk / position-size panel — display-only helpers       |
 //+------------------------------------------------------------------+
-string RISK_PANEL_NAME = "FM_RiskPanel";
 
 double ResolveRiskPercent()
   {
@@ -398,70 +399,143 @@ string MMStateLabel(ENUM_FM_STATE st)
      }
   }
 
-void UpdateRiskPanel(CFMEngine &eng)
+// v1.5 fix: a single OBJ_LABEL with embedded "\n" only reliably renders its
+// FIRST line on some terminal builds — this was the "only the first line
+// shows" bug. Fixed by using one OBJ_LABEL PER ROW instead, each with its
+// own Y offset — the standard, universally-reliable MQL5 dashboard pattern.
+void DeleteObjectsByPrefix(const string prefix)
   {
-   if(!InpShowRiskPanel)
+   int total = ObjectsTotal(0, -1, -1);
+   for(int i = total - 1; i >= 0; i--)
      {
-      if(ObjectFind(0, RISK_PANEL_NAME) >= 0) ObjectDelete(0, RISK_PANEL_NAME);
-      return;
+      string name = ObjectName(0, i, -1, -1);
+      if(StringFind(name, prefix) == 0)
+         ObjectDelete(0, name);
      }
+  }
+
+void DrawCornerLine(const int rowIndex, const string text_)
+  {
+   string name = "FM_RPRow" + IntegerToString(rowIndex);
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, InpRiskPanelXDistance);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, InpRiskPanelYDistance + rowIndex * (InpRiskPanelFontSize + 6));
+   ObjectSetInteger(0, name, OBJPROP_COLOR, InpRiskPanelColor);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, InpRiskPanelFontSize);
+   ObjectSetString(0, name, OBJPROP_FONT, "Consolas");
+   ObjectSetString(0, name, OBJPROP_TEXT, text_);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+   ObjectSetInteger(0, name, OBJPROP_BACK, false);
+  }
+
+// Price-anchored (not corner-anchored) single-line text, used to stack the
+// per-zone Ratio/Stop/Lot rows right next to that zone's own target line —
+// same OBJ_TEXT anchoring Visualizer.mqh already uses for its own labels,
+// so these move with the chart exactly like the zone box/line do.
+void DrawZoneLine(const string name, const datetime t, const double price, const string text_, const color clr)
+  {
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_TEXT, 0, t, price);
+   else
+      ObjectMove(0, name, 0, t, price);
+   ObjectSetString(0, name, OBJPROP_TEXT, text_);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, (int)MathMax(7, InpRiskPanelFontSize - 2));
+   ObjectSetString(0, name, OBJPROP_FONT, "Consolas");
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+   ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT);
+  }
+
+void UpdateRiskPanel(CFMEngine &eng, double atrNow)
+  {
+   // clean slate each closed bar, then redraw only what's currently on —
+   // simpler and safer than tracking which ids/rows existed last time.
+   DeleteObjectsByPrefix("FM_RPRow");
+   DeleteObjectsByPrefix("FM_RZ_");
+
+   if(!InpShowRiskPanel && !InpShowZoneRiskTable)
+      return;
 
    double riskMoney = GetRiskMoney();
    bool commAuto = false;
    double commission = GetEffectiveCommission(commAuto);
 
-   string riskLabel;
-   if(InpRiskType == RISK_TYPE_PERCENT)
-      riskLabel = StringFormat("Risk: %.2f%% ($%.2f)", ResolveRiskPercent(), riskMoney);
-   else
-      riskLabel = StringFormat("Risk: $%.2f", riskMoney);
-
-   string text = "FM Risk Panel\n" + riskLabel + "\n" +
-                 StringFormat("Commission: $%.2f/lot (%s)", commission, commAuto ? "auto" : "manual") + "\n";
+   double ratios[];
+   ParseMMRatios(ratios);
 
    FMSetupSnapshot list[];
    int shown = CollectMMSetupsForPanel(eng, list);
-   if(shown == 0)
+   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+
+   //--- top-left corner summary panel (toggle: InpShowRiskPanel) ---
+   if(InpShowRiskPanel)
      {
-      text += "No active buy/sell zone in range yet";
+      int row = 0;
+      string riskLabel;
+      if(InpRiskType == RISK_TYPE_PERCENT)
+         riskLabel = StringFormat("Risk: %.2f%% ($%.2f)", ResolveRiskPercent(), riskMoney);
+      else
+         riskLabel = StringFormat("Risk: $%.2f", riskMoney);
+
+      DrawCornerLine(row++, "FM Risk Panel");
+      DrawCornerLine(row++, riskLabel);
+      DrawCornerLine(row++, StringFormat("Commission: $%.2f/lot (%s)", commission, commAuto ? "auto" : "manual"));
+
+      if(shown == 0)
+        {
+         DrawCornerLine(row++, "No active buy/sell zone in range yet");
+        }
+      else
+        {
+         for(int k = 0; k < shown; k++)
+           {
+            FMSetupSnapshot s = list[k];
+            double mmRangePoints = (point > 0) ? MathAbs(s.a1_price - s.a0_price) / point : 0.0;
+            string fam  = MMFamilyLabel(s.family);
+            string side = (s.dir > 0 ? "SELL" : "BUY");
+
+            DrawCornerLine(row++, " ");
+            DrawCornerLine(row++, StringFormat("%s%s %s #%d MM=%.1fpt", fam, MMStateLabel(s.state), side, (int)s.id, mmRangePoints));
+            DrawCornerLine(row++, "Ratio Stop(pts) Lot");
+            for(int i = 0; i < ArraySize(ratios); i++)
+              {
+               double stopPts, lot;
+               ComputeRatioRow(mmRangePoints, ratios[i], InpRiskPanelMinStopPoints, riskMoney, commission, stopPts, lot);
+               DrawCornerLine(row++, StringFormat("%3.0f%%   %7.0f   %.2f", ratios[i] * 100.0, stopPts, lot));
+              }
+           }
+        }
      }
-   else
+
+   //--- inline Ratio/Stop/Lot table next to each zone's own box/line (toggle: InpShowZoneRiskTable) ---
+   if(InpShowZoneRiskTable && shown > 0)
      {
-      double ratios[];
-      ParseMMRatios(ratios);
-      double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      datetime tNow = TimeCurrent();
+      double rowStep = (atrNow > 0) ? atrNow * 0.12 : point * 200;
 
       for(int k = 0; k < shown; k++)
         {
          FMSetupSnapshot s = list[k];
          double mmRangePoints = (point > 0) ? MathAbs(s.a1_price - s.a0_price) / point : 0.0;
-         string fam  = MMFamilyLabel(s.family);
-         string side = (s.dir > 0 ? "SELL" : "BUY"); // bull MM fades short, bear MM fades long
-         text += StringFormat("\n%s%s %s #%d  MM=%.1f pts\n", fam, MMStateLabel(s.state), side, (int)s.id, mmRangePoints);
-         text += "Ratio  Stop(pts)   Lot\n";
+         color rowColor = (s.state == FM_CONFIRMED ? clrLime : (s.state == FM_DEVELOPING ? clrOrange : clrDodgerBlue));
+         string idStr = IntegerToString((int)s.id);
+
+         DrawZoneLine("FM_RZ_" + idStr + "_HDR", tNow, s.target, "Ratio  Stop   Lot", rowColor);
 
          for(int i = 0; i < ArraySize(ratios); i++)
            {
             double stopPts, lot;
             ComputeRatioRow(mmRangePoints, ratios[i], InpRiskPanelMinStopPoints, riskMoney, commission, stopPts, lot);
-            text += StringFormat("%3.0f%%    %7.0f    %.2f\n", ratios[i] * 100.0, stopPts, lot);
+            double rowPrice = s.target + s.dir * (i + 1) * rowStep; // stack outward, away from current price
+            string rtext = StringFormat("%3.0f%%  %5.0fpt  %.2fL", ratios[i] * 100.0, stopPts, lot);
+            DrawZoneLine("FM_RZ_" + idStr + "_R" + IntegerToString(i), tNow, rowPrice, rtext, rowColor);
            }
         }
      }
-
-
-   if(ObjectFind(0, RISK_PANEL_NAME) < 0)
-      ObjectCreate(0, RISK_PANEL_NAME, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_XDISTANCE, InpRiskPanelXDistance);
-   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_YDISTANCE, InpRiskPanelYDistance);
-   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_COLOR, InpRiskPanelColor);
-   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_FONTSIZE, InpRiskPanelFontSize);
-   ObjectSetString(0, RISK_PANEL_NAME, OBJPROP_FONT, "Consolas");
-   ObjectSetString(0, RISK_PANEL_NAME, OBJPROP_TEXT, text);
-   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_SELECTABLE, false);
-   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_HIDDEN, true);
-   ObjectSetInteger(0, RISK_PANEL_NAME, OBJPROP_BACK, false);
   }
 
 // v2 MTF/LTF overlays (read-only): SMA20/50-gap bias on another timeframe.
@@ -817,7 +891,7 @@ int OnCalculate(const int rates_total,
             if(BufTarget[1]==EMPTY_VALUE) BufTarget[1]=s.target;
         }
       g_viz.Sync(rates, rates_total, *eng, g_cfg, atrNow);
-      UpdateRiskPanel(*eng); // v1.4: risk/position-size panel (display-only)
+      UpdateRiskPanel(*eng, atrNow); // v1.4/v1.5: risk/position-size panel (display-only)
       g_first_run=false;
       return(rates_total);
      }
