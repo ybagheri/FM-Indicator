@@ -10,14 +10,15 @@ import math
 def norm_vol(v, mn, mx, st):
     if st <= 0:
         st = 0.01
-    v = math.floor(v / st) * st
+    v = math.floor(v / st + 1e-9) * st   # epsilon, mirrors RiskManager.mqh NormVol
     v = max(mn, min(mx, v))
     return round(v, 8)
 
 
 def size_volume(risk_money, loss_per_lot, mn, mx, st):
+    # 0.0 == cannot size safely -> Check() vetoes BAD_VOLUME (never "min lot")
     if risk_money <= 0 or loss_per_lot <= 0:
-        return mn
+        return 0.0
     return norm_vol(risk_money / loss_per_lot, mn, mx, st)
 
 
@@ -44,7 +45,8 @@ def check(valid, r_mult, cfg, st):
 
 
 class DayBook:
-    """Mirror of OnNewDay/NotifyTradeClosed accounting."""
+    """Mirror of OnNewDay/NotifyTradeOpened/NotifyTradeClosed accounting.
+    The daily trade COUNT is incremented on OPEN only (never on close)."""
 
     def __init__(self):
         self.day = 0
@@ -58,8 +60,10 @@ class DayBook:
             self.trades = 0
             self.pl = 0.0
 
-    def closed(self, profit):
+    def opened(self):
         self.trades += 1
+
+    def closed(self, profit):
         self.pl += profit
         self.consec = self.consec + 1 if profit < 0 else 0
 

@@ -54,7 +54,7 @@ private:
       double st = SymbolInfoDouble(sym, SYMBOL_VOLUME_STEP);
       if(st <= 0)
          st = 0.01;
-      v = MathFloor(v / st) * st;
+      v = MathFloor(v / st + 1e-9) * st;   // epsilon: 0.29/0.01 = 28.999999999999996 in IEEE-754
       v = NormalizeDouble(v, 8);
       if(v < mn)
          v = mn;
@@ -115,7 +115,9 @@ public:
      }
    void              NotifyTradeClosed(double profit)
      {
-      m_tradesToday++;
+      // NOTE: the daily trade COUNT is incremented by NotifyTradeOpened()
+      // only; counting here too made InpMaxTradesDay trigger after ~half
+      // the configured number of trades.
       m_dailyPL += profit;
       if(profit < 0)
          m_consecLosses++;
@@ -124,34 +126,38 @@ public:
      }
    void              NotifyTradeOpened() { m_tradesToday++; }
 
-   // Volume for entry→stop on symbol (never zero; symbol-clamped).
+   // Volume for entry→stop on symbol, symbol-clamped. Returns 0.0 when the
+   // trade CANNOT be sized safely (non-positive risk budget, zero stop
+   // distance, failed OrderCalcProfit); Check() turns 0.0 into BAD_VOLUME.
+   // It never silently falls back to the minimum lot: InpRiskPct<=0 must
+   // mean "do not trade", not "trade the minimum".
    double            ComputeVolume(string sym, double entry, double stop) const
      {
+      if(m_lotMode == LOT_FIXED)
+         return (m_fixedLot > 0 ? NormVol(sym, m_fixedLot) : 0.0);
       double dist = MathAbs(entry - stop);
       if(dist <= 0)
-         return SymbolInfoDouble(sym, SYMBOL_VOLUME_MIN);
+         return 0.0;
       double riskMoney = m_moneyRisk;
-      if(m_lotMode == LOT_FIXED)
-         return NormVol(sym, m_fixedLot);
       if(m_lotMode == LOT_RISK_PCT)
          riskMoney = AccountInfoDouble(ACCOUNT_EQUITY) * m_riskPct / 100.0;
       if(riskMoney <= 0)
-         return SymbolInfoDouble(sym, SYMBOL_VOLUME_MIN);
+         return 0.0;
       double loss1 = 0.0;
       // loss on 1.0 lot if price moves entry→stop (direction-aware)
       if(stop < entry)
         {
          if(!OrderCalcProfit(ORDER_TYPE_BUY, sym, 1.0, entry, stop, loss1))
-            return SymbolInfoDouble(sym, SYMBOL_VOLUME_MIN);
+            return 0.0;
         }
       else
         {
          if(!OrderCalcProfit(ORDER_TYPE_SELL, sym, 1.0, entry, stop, loss1))
-            return SymbolInfoDouble(sym, SYMBOL_VOLUME_MIN);
+            return 0.0;
         }
       loss1 = -loss1; // OrderCalcProfit is negative for a loss
       if(loss1 <= 0)
-         return SymbolInfoDouble(sym, SYMBOL_VOLUME_MIN);
+         return 0.0;
       return NormVol(sym, riskMoney / loss1);
      }
 

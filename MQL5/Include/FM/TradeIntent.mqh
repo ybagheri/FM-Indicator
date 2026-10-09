@@ -117,6 +117,11 @@ private:
      }
 
 public:
+   // Public view of the per-strategy BE/trail/partial permissions so the EA's
+   // position-management loop honors them (it used to hard-code `true`).
+   static void       PermitsFor(ENUM_FM_STRATEGY st, bool &be, bool &trail, bool &partial)
+     { Permits(st, be, trail, partial); }
+
                      CTradeIntentBuilder(): m_tradeProvisional(false),
       m_maxHoldBars(5), m_chaseATRMult(0.5) {}
 

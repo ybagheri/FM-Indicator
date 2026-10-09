@@ -16,7 +16,7 @@
 //| direction or a 3-MA cross.                                        |
 //+------------------------------------------------------------------+
 #property copyright "Ilan1 MT5 conversion + FM-Indicator strategy engine"
-#property version   "2.00"
+#property version   "2.01"
 #property strict
 
 #include <Trade/Trade.mqh>
@@ -112,7 +112,10 @@ input color             InpBELineColor            = clrMagenta;
 input group "=== Hard protection (grid-end SL & basket kill-switch) ==="
 input bool              InpUseBasketStopLoss      = true;
 input double            InpStopLossExtraPoints    = 0.0;         // extra points beyond last grid level
-input double            InpMaxBasketLossMoney     = 0.0;         // NEW: force-close whole basket if floating loss >= this (account ccy, 0 = off)
+input double            InpMaxBasketLossMoney     = 0.0;         // force-close whole basket if floating loss >= this (account ccy, 0 = off)
+input double            InpMaxBasketLossPct       = 25.0;        // v2.01: ALSO force-close if floating loss >= this % of account BALANCE (0 = off). Smaller of the two limits wins.
+input double            InpSLBeyondLastStepFrac   = 0.5;         // v2.01: put the grid-end SL this fraction of the last grid step BEYOND the last level (0 = legacy: SL == last level's entry)
+input double            InpMinMarginLevelPct      = 150.0;       // v2.01: refuse to open a basket if the full-grid worst case would drop margin level below this % (0 = off)
 
 input group "=== Execution & Recovery ==="
 input int               InpDeviationPoints        = 10;
@@ -133,6 +136,7 @@ input int    InpADRPeriod        = 14;   // دوره زمانی محاسبه ADR
 //====================================================================
 double   g_pip_steps[];
 datetime g_last_process   = 0;
+bool     g_basket_close_pending = false; // v2.01: a basket close failed — keep retrying, do not re-grid
 datetime g_last_bar_time  = 0;
 int      g_fast_handle    = INVALID_HANDLE;
 int      g_mid_handle     = INVALID_HANDLE;
@@ -226,6 +230,65 @@ double LotForLevel(const int level)
    double lot = InpInitialLot * MathPow(InpLotExponent, group)
                 + group * InpAddToLot;
    return NormalizeVolume(lot);
+}
+
+//====================================================================
+// CAPITAL GUARD (v2.01) — margin / volume-limit pre-check
+//====================================================================
+double WorstCaseGridLots()
+{
+   double total = 0.0;
+   for(int lvl = 0; lvl < InpMaxTrades; lvl++)
+      total += LotForLevel(lvl);
+   return total;
+}
+
+// Worst case = every one of InpMaxTrades levels filled. Uses current equity and
+// margin already used (other EAs included). Does NOT model floating loss of the
+// deep levels; InpMaxBasketLossPct / the grid-end SL cover that side.
+bool CapitalGuardAllows(const ENUM_POSITION_TYPE direction)
+{
+   static datetime s_last_log = 0;
+   string why = "";
+
+   double lots   = WorstCaseGridLots();
+   double vlimit = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_LIMIT);
+   if(vlimit > 0.0 && lots > vlimit + 1e-9)
+      why = StringFormat("worst-case grid volume %.2f lots exceeds SYMBOL_VOLUME_LIMIT %.2f", lots, vlimit);
+
+   if(why == "" && InpMinMarginLevelPct > 0.0)
+   {
+      ENUM_ORDER_TYPE ot = (direction == POSITION_TYPE_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+      double price = SymbolInfoDouble(_Symbol, (direction == POSITION_TYPE_BUY) ? SYMBOL_ASK : SYMBOL_BID);
+      double need = 0.0;
+      if(!OrderCalcMargin(ot, _Symbol, lots, price, need) || need <= 0.0)
+         why = "OrderCalcMargin failed for the worst-case grid volume";
+      else
+      {
+         double used  = AccountInfoDouble(ACCOUNT_MARGIN);
+         double eq    = AccountInfoDouble(ACCOUNT_EQUITY);
+         double level = eq / (used + need) * 100.0;
+         if(level < InpMinMarginLevelPct)
+            why = StringFormat("full-grid margin level %.0f%% < required %.0f%% (worst case %.2f lots, margin %.2f, equity %.2f)",
+                               level, InpMinMarginLevelPct, lots, used + need, eq);
+      }
+   }
+
+   if(why == "")
+      return true;
+
+   if(TimeCurrent() - s_last_log >= 60)   // do not spam the journal every tick
+   {
+      Print("Capital guard blocked new basket: ", why);
+      s_last_log = TimeCurrent();
+   }
+   return false;
+}
+
+bool TradeSucceeded()
+{
+   uint rc = trade.ResultRetcode();
+   return (rc == TRADE_RETCODE_DONE || rc == TRADE_RETCODE_DONE_PARTIAL || rc == TRADE_RETCODE_PLACED);
 }
 
 //====================================================================
@@ -362,7 +425,7 @@ double BasketFloatingProfit(const bool include_costs)
          if(InpIncludeSwap)
             total += PositionGetDouble(POSITION_SWAP);
          if(InpIncludeCommission)
-            total += comm;
+            total -= comm;   // commission is a COST (InpCommissionPerLot is positive)
       }
    }
    return total;
@@ -392,8 +455,10 @@ bool CalculateBasketBreakEven(double &be_price, ENUM_POSITION_TYPE &direction)
       total_volume  += v;
       weighted_open += v * p;
 
+      // fixed_cost is a signed MONEY ADJUSTMENT to basket profit (negative = cost):
+      // commission is a cost -> subtract; swap is already signed (negative when paid) -> add.
       if(InpIncludeCommission)
-         fixed_cost += v * InpCommissionPerLot;
+         fixed_cost -= v * InpCommissionPerLot;
       if(InpIncludeSwap)
          fixed_cost += PositionGetDouble(POSITION_SWAP);
    }
@@ -723,7 +788,10 @@ double GridBoundaryPrice(const ENUM_POSITION_TYPE direction)
          boundary += step_pts * PointValue();
    }
 
-   double extra = InpStopLossExtraPoints * PointValue();
+   // v2.01: the last level's own entry must not coincide with the SL, otherwise it
+   // is scratched the moment it fills. Add a fraction of the last grid step.
+   double beyond_pts = MathMax(0.0, InpSLBeyondLastStepFrac) * GridStepPoints(InpMaxTrades - 2);
+   double extra = (InpStopLossExtraPoints + beyond_pts) * PointValue();
    if(direction == POSITION_TYPE_BUY)
       boundary -= extra;
    else
@@ -837,30 +905,56 @@ void SetAllBasketTP(const double be_price, const ENUM_POSITION_TYPE direction)
    }
 }
 
-void CloseBasketAndRestart()
+// Pendings are deleted FIRST so no new level can fill while positions close.
+// Every close result is checked; on any failure the BE line and a retry flag are
+// kept (OnTick keeps retrying instead of re-building the grid). Returns true
+// only when no position of this EA remains to be closed.
+bool CloseBasketAndRestart()
 {
+   DeleteAllPending();
+
+   bool all_ok = true;
    for(int i = PositionsTotal() - 1; i >= 0; i--)
    {
       ulong ticket = PositionGetTicket(i);
-      if(IsOurPosition(ticket))
-         trade.PositionClose(ticket, InpDeviationPoints);
+      if(!IsOurPosition(ticket)) continue;
+
+      bool sent = trade.PositionClose(ticket, InpDeviationPoints);
+      if(!sent || !TradeSucceeded())
+      {
+         all_ok = false;
+         Print("CloseBasket: close of #", ticket, " FAILED rc=", trade.ResultRetcode(),
+               " ", trade.ResultComment(), " — will retry");
+      }
    }
-   DeleteAllPending();
-   RemoveBELine();
+
+   g_basket_close_pending = !all_ok;
+   if(all_ok)
+      RemoveBELine();
+   return all_ok;
 }
 
 // NEW: hard money kill-switch for the whole basket (protects against a grid
 // that has run past InpMaxTrades levels against strong sustained trend).
 void CheckBasketKillSwitch()
 {
-   if(InpMaxBasketLossMoney <= 0.0) return;
+   double limit = 0.0;                                  // smallest enabled limit wins
+   if(InpMaxBasketLossMoney > 0.0)
+      limit = InpMaxBasketLossMoney;
+   if(InpMaxBasketLossPct > 0.0)
+   {
+      double pct_limit = AccountInfoDouble(ACCOUNT_BALANCE) * InpMaxBasketLossPct / 100.0;
+      if(pct_limit > 0.0 && (limit <= 0.0 || pct_limit < limit))
+         limit = pct_limit;
+   }
+   if(limit <= 0.0) return;
    if(CountPositions() == 0) return;
 
    double floatingLoss = -BasketFloatingProfit(true);
-   if(floatingLoss >= InpMaxBasketLossMoney)
+   if(floatingLoss >= limit)
    {
       Print("Basket kill-switch: floating loss ", DoubleToString(floatingLoss, 2),
-            " >= limit ", DoubleToString(InpMaxBasketLossMoney, 2), " — closing basket.");
+            " >= limit ", DoubleToString(limit, 2), " — closing basket.");
       CloseBasketAndRestart();
    }
 }
@@ -927,6 +1021,8 @@ bool OpenInitial(const ENUM_POSITION_TYPE direction)
       Print("Spread too wide, skip initial entry");
       return false;
    }
+   if(!CapitalGuardAllows(direction))
+      return false;
 
    trade.SetExpertMagicNumber(InpMagic);
    trade.SetDeviationInPoints(InpDeviationPoints);
@@ -969,6 +1065,8 @@ bool OpenInitial(const ENUM_POSITION_TYPE direction)
    else
       ok = trade.Sell(lot, _Symbol, 0.0, sl, tp, "FM_Ilan Initial SELL");
 
+   if(ok && !TradeSucceeded())
+      ok = false;   // CTrade returning true only means "request sent", not "filled"
    if(!ok)
       Print("OpenInitial failed: ", trade.ResultRetcode(), " ", trade.ResultComment());
    return ok;
@@ -1186,6 +1284,8 @@ int GetEntrySignal()
 //+------------------------------------------------------------------+
 double GetADR(string symbol, int period)
   {
+   if(period <= 0)
+      return 0.0;   // never divide by zero (also rejected in ValidateInputs)
    MqlRates rates[];
    ArraySetAsSeries(rates, true);
 
@@ -1285,6 +1385,36 @@ void RecoverState()
 //====================================================================
 // LIFECYCLE
 //====================================================================
+bool ValidateInputs()
+{
+   string e = "";
+   if(InpMaxTrades < 1)               e += " InpMaxTrades<1;";
+   if(InpInitialLot <= 0.0)           e += " InpInitialLot<=0;";
+   if(InpLotExponent <= 0.0)          e += " InpLotExponent<=0;";
+   if(InpAddToLot < 0.0)              e += " InpAddToLot<0;";
+   if(InpAddLotEveryNTrades < 0)      e += " InpAddLotEveryNTrades<0;";
+   if(InpMaxSpreadPoints < 0)         e += " InpMaxSpreadPoints<0;";
+   if(InpInitialTPPoints < 0.0)       e += " InpInitialTPPoints<0;";
+   if(InpBEOffsetPoints < 0.0)        e += " InpBEOffsetPoints<0;";
+   if(InpStopLossExtraPoints < 0.0)   e += " InpStopLossExtraPoints<0;";
+   if(InpSLBeyondLastStepFrac < 0.0)  e += " InpSLBeyondLastStepFrac<0;";
+   if(InpMaxBasketLossMoney < 0.0)    e += " InpMaxBasketLossMoney<0;";
+   if(InpMaxBasketLossPct < 0.0 || InpMaxBasketLossPct > 100.0) e += " InpMaxBasketLossPct must be in [0,100];";
+   if(InpMinMarginLevelPct < 0.0)     e += " InpMinMarginLevelPct<0;";
+   if(InpCommissionPerLot < 0.0)      e += " InpCommissionPerLot<0;";
+   if(InpDeviationPoints < 0)         e += " InpDeviationPoints<0;";
+   if(InpMaxCandleADRMult < 0.0)      e += " InpMaxCandleADRMult<0;";
+   if(InpMaxCandleADRMult > 0.0 && InpADRPeriod < 1) e += " InpADRPeriod<1;";
+   if(ArraySize(g_pip_steps) == 0)    e += " InpPipStepString has no valid step;";
+   else if(GridStepPoints(0) <= 0.0)  e += " first grid step is 0;";
+   if(e != "")
+   {
+      Print("FM_Ilan_GridEA INIT_FAILED invalid inputs:", e);
+      return false;
+   }
+   return true;
+}
+
 int OnInit()
 {
    if(AccountInfoInteger(ACCOUNT_MARGIN_MODE) != ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
@@ -1294,6 +1424,8 @@ int OnInit()
    }
 
    ParsePipSteps();
+   if(!ValidateInputs())
+      return INIT_PARAMETERS_INCORRECT;
    BE_LINE_NAME = "FM_Ilan_BE_" + IntegerToString(InpMagic) + "_" + _Symbol;
 
    trade.SetExpertMagicNumber(InpMagic);
@@ -1319,7 +1451,7 @@ int OnInit()
 
    RecoverState();
 
-   Print("FM_Ilan_GridEA v2.00 started. EntryMode=", EnumToString(InpEntryMode),
+   Print("FM_Ilan_GridEA v2.01 started. EntryMode=", EnumToString(InpEntryMode),
          " MaxTrades=", InpMaxTrades,
          " AddLotEveryN=", InpAddLotEveryNTrades,
          " InitialTP=", InpInitialTPPoints,
@@ -1346,6 +1478,12 @@ void OnTick()
    bool isNewBar = IsNewBar(); // single shared bar-time tracker (was duplicated before)
 
    int positions = CountPositions();
+
+   if(g_basket_close_pending)
+   {
+      if(positions > 0) { CloseBasketAndRestart(); return; }   // keep trying; no re-grid, no new entries
+      g_basket_close_pending = false;
+   }
 
    if(positions == 0)
    {

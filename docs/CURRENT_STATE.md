@@ -38,7 +38,7 @@
 
 ## EA Status
 
-- **No EA exists in the repo.** The only EA on record is `FM_SmokeTest.mq5`
+- **EAs in the repo:** `MQL5/Experts/FM_EA.mq5` (analysis / paper / demo / live, gated by `InpTradeMode`) and `MQL5/Experts/FM_Ilan_GridEA.mq5` (grid/martingale executor). Historical note — the first EA on record was `FM_SmokeTest.mq5`
   v1.00, which lives SOLELY in the terminal `MQL5/Experts/` folder: attaches
   the indicator via `iCustom` (defaults) and reads the 4 DATA buffers per
   new bar. It places no orders. It must NOT be committed here (indicator
@@ -60,7 +60,7 @@
 | Phase 6 FM setup plans | `SetupEngine` | `setup_engine.py` | 10 |
 | Phase 7 general catalog + best | `GeneralSetups` | `general_setups.py` | 10 |
 | Phase 8 decision + reasons | `DecisionEngine` | `decision.py` | 10 |
-| **Total UNIT TEST** | | | **97, all pass (re-run 2026-09-04)** |
+| **Total UNIT TEST** | | | see `.github/workflows/tests.yml` — run `for f in tests/test_*.py; do python $f; done` (counts drift; CI is the source of truth) |
 
 Reuse surface for the EA (already exists, no refactor needed to START):
 `CFMEngine::ActiveSnapshots(FMSetupSnapshot[])` + `GetSetup/ActiveCount`,
@@ -72,7 +72,7 @@ refactor, indicator behavior byte-identical, mirror-tested).
 
 ## Testing Status
 
-- UNIT TEST: 97/97 pass (re-run this session).
+- UNIT TEST: all `tests/test_*.py` suites pass (CI runs them on every push).
 - MT5 BACKTEST (smoke only, no orders): 2 runs, both pass, 0 errors —
   detail in `docs/MT5_TESTING_STATUS.md`.
 - NOT TESTED: visual chart behavior, repaint-vs-history comparison,
@@ -128,7 +128,7 @@ then Phase 22 strategy registry, Phase 23 EA skeleton (ANALYSIS_ONLY first).
   (Phase 23) calls the same `Update` per new closed bar, then risk/execution.
 - Migration plan: (1) move code verbatim, no logic edits; (2) Python mirror
   unchanged (already mirrors each layer); (3) prove byte-identical behavior:
-  MT5 smoke-run edge counts (T-001/T-002) must reproduce exactly + 97 UNIT
+  MT5 smoke-run edge counts (T-001/T-002) must reproduce exactly + all UNIT
   TESTS pass + 0/0 compile.
 - Risk: LOW (mechanical move, verified by reproduction). Rejected alternative:
   EA-via-`iCustom` buffers only — keeps logic single-sourced but hides

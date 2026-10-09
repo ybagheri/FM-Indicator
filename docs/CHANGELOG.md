@@ -80,3 +80,27 @@ Format: one entry per phase; EA trading behavior is unchanged throughout
 - Known remaining work: MetaEditor compile + Strategy Tester runs + first live
   Workflow-B comparison (no terminal in this environment); per-historical-bar
   parity visualization (DEBUG/CSV only for now).
+
+## Review fixes (FM_Ilan_GridEA v2.01, FM_EA v1.01)
+
+Behavior CHANGES (intentional, safety-related):
+- Grid EA: new capital guard — a basket is not opened if the worst-case full grid
+  would push margin level below `InpMinMarginLevelPct` (default 150) or exceeds
+  `SYMBOL_VOLUME_LIMIT`. New `InpMaxBasketLossPct` (default 25 % of balance)
+  kill-switch alongside `InpMaxBasketLossMoney`. Set either to 0 to disable.
+- Grid EA: grid-end SL now sits `InpSLBeyondLastStepFrac` (default 0.5) of the last
+  step beyond the last level (0 = legacy), so the last level is no longer scratched
+  on fill.
+- Grid EA: **commission sign fixed** in basket break-even and floating-profit
+  (it was treated as profit). BE price moves further in profit; basket P/L is lower.
+- Grid EA: `CloseBasketAndRestart` deletes pendings first, checks every close, retries
+  on failure instead of re-gridding; `OpenInitial` checks the retcode.
+- Grid EA: input validation (`InpADRPeriod`, lots, steps, ...) in OnInit.
+- FM_EA: `ScanClosedDeals` filters by symbol; daily trade count incremented once per
+  trade (was twice: `InpMaxTradesDay=5` behaved like ~3); paper fills now count;
+  `ComputeVolume` returns 0 (veto BAD_VOLUME) instead of the minimum lot when the
+  risk budget/stop is invalid; `NormVol` epsilon (0.29 lot was floored to 0.28);
+  per-strategy BE/trail permissions are honored; EA input validation; stale
+  "ANALYSIS_ONLY / no orders" header and init log corrected.
+- Removed stale root copy of `FM_Ilan_GridEA.mq5` (use `MQL5/Experts/`).
+- Added `.github/workflows/tests.yml` and `tests/test_grid_math.py`.

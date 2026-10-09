@@ -1,12 +1,13 @@
 //+------------------------------------------------------------------+
 //| FM_EA.mq5 : Al Brooks-inspired Price Action EA (Phase 23)          |
-//| ANALYSIS_ONLY skeleton: consumes the SHARED engine (CFMAnalysis +  |
-//| CStrategyRegistry), logs decisions, places NO orders. Execution,   |
-//| risk and position layers arrive in Phases 24–26.                   |
+//| Consumes the SHARED engine (CFMAnalysis + CStrategyRegistry).      |
+//| InpTradeMode selects behavior: ANALYSIS_ONLY (default) logs only,  |
+//| PAPER simulates fills, DEMO/LIVE place REAL orders (live needs     |
+//| InpLiveToken). See docs/EA_USER_GUIDE.md and SafetyManager.mqh.    |
 //| Non-repainting: closed bars only (shift>=1), one analysis per bar.  |
 //+------------------------------------------------------------------+
 #property copyright "FM-Indicator contributors"
-#property version   "1.00"
+#property version   "1.01"
 #property strict
 
 #include <FM/Config.mqh>
@@ -26,7 +27,7 @@
 input group "=== FM-Indicator Analysis Parameters (shared engine — includes v1.3 session-MM Session* inputs) ==="
 #include <FM/Inputs.mqh>       // shared analysis inputs (verbatim)
 
-//--- EA inputs (Phase 23: selection + identity only; trading inputs later)
+//--- EA inputs (strategy selection + identity)
 input ENUM_STRATEGY_MODE InpStratMode      = STRAT_MODE_AUTO;
 input ENUM_FM_STRATEGY   InpSingleStrategy = STRAT_FM_FADE;
 input bool               InpUseFM          = true;
@@ -37,7 +38,7 @@ input bool               InpUseDouble      = true;
 input bool               InpUseFailedBO    = true;   // Phase 28
 input long               InpMagic          = 20260904;
 input int                InpHistoryBars    = 1500;
-//--- risk inputs (Phase 24; sizing + caps, still ANALYSIS_ONLY)
+//--- risk inputs (sizing + caps)
 input ENUM_LOT_MODE      InpLotMode        = LOT_RISK_PCT;
 input double             InpFixedLot       = 0.10;
 input double             InpRiskPct        = 1.0;
@@ -105,8 +106,41 @@ long              g_riskOK = 0;
 long              g_veto = 0;
 long              g_vetoByReason[11];   // EXP-0002: indexed by ENUM_DECISION_REASON
 
+//--- EA-level input validation (Config::Validate only covers the shared engine
+//    inputs). Rejects values that would otherwise silently disable a guard.
+bool ValidateEAInputs()
+  {
+   string e = "";
+   if(InpHistoryBars < 100)                          e += " InpHistoryBars<100;";
+   if(InpLotMode == LOT_FIXED && InpFixedLot <= 0)   e += " InpFixedLot<=0;";
+   if(InpLotMode == LOT_RISK_PCT && (InpRiskPct <= 0 || InpRiskPct > 100))
+                                                     e += " InpRiskPct must be in (0,100];";
+   if(InpLotMode == LOT_MONEY && InpMoneyRisk <= 0)  e += " InpMoneyRisk<=0;";
+   if(InpMaxDailyLoss < 0)                           e += " InpMaxDailyLoss<0;";
+   if(InpMaxTradesDay < 0 || InpMaxOpenPos < 0 || InpMaxPerSymbol < 0 || InpMaxConsecLoss < 0)
+                                                     e += " negative trade/position cap;";
+   if(InpMaxSpreadPts < 0)                           e += " InpMaxSpreadPts<0;";
+   if(InpRiskMinRR < 0)                              e += " InpRiskMinRR<0;";
+   if(InpSlippagePts < 0)                            e += " InpSlippagePts<0;";
+   if(InpTrailStartPts < 0 || InpTrailStepPts < 0 || InpBETriggerPts < 0 || InpBEOffsetPts < 0)
+                                                     e += " negative BE/trail points;";
+   if(InpMaxHoldBars < 0 || InpChaseATRMult < 0)     e += " negative intent parameter;";
+   if(InpMaxDrawdownPct < 0 || InpMaxDrawdownPct > 100)
+                                                     e += " InpMaxDrawdownPct must be in [0,100];";
+   if(InpSessionStartH < 0 || InpSessionStartH > 24 || InpSessionEndH < 0 || InpSessionEndH > 24)
+                                                     e += " session hour outside 0..24;";
+   if(e != "")
+     {
+      PrintFormat("[FM_EA] INIT_FAILED invalid inputs:%s", e);
+      return false;
+     }
+   return true;
+  }
+
 int OnInit()
   {
+   if(!ValidateEAInputs())
+      return(INIT_PARAMETERS_INCORRECT);
    FM_ApplyInputs(g_cfg);
    g_log.SetLevel(g_cfg.LogLevel);
    g_analysis.Setup(g_cfg, GetPointer(g_log));
@@ -136,8 +170,10 @@ int OnInit()
       PrintFormat("[FM_EA] adopted %d open position(s) on init", nAdopt);
    ArrayInitialize(g_selCount, 0);
    ArrayInitialize(g_vetoByReason, 0);
-   PrintFormat("[FM_EA] init OK mode=%s magic=%d history=%d (ANALYSIS_ONLY, no orders)",
-               CStrategyRegistry::ModeName(InpStratMode), InpMagic, InpHistoryBars);
+   PrintFormat("[FM_EA] init OK strat=%s magic=%d history=%d tradeMode=%s (%s)",
+               CStrategyRegistry::ModeName(InpStratMode), InpMagic, InpHistoryBars,
+               CSafetyManager::ModeName(InpTradeMode),
+               (InpTradeMode == TRADE_DEMO || InpTradeMode == TRADE_LIVE) ? "REAL ORDERS ENABLED" : "no real orders");
    return(INIT_SUCCEEDED);
   }
 
@@ -313,13 +349,19 @@ void OnTick()
    for(int i = 0; i < ArraySize(mine); i++)
      {
       ModifyResult mr;
-      if(g_pos.MaybeBreakEven(mine[i], true, mr) && mr.ok)
+      // Per-strategy permissions (fades/reversals/doubles: BE only; trailing
+      // would fight the measured-move objective). Adopted positions whose
+      // strategy cannot be parsed keep the previous permissive behavior.
+      bool allowBE = true, allowTrail = true, allowPartial = false;
+      if(mine[i].strategy != STRAT_NONE)
+         CTradeIntentBuilder::PermitsFor(mine[i].strategy, allowBE, allowTrail, allowPartial);
+      if(g_pos.MaybeBreakEven(mine[i], allowBE, mr) && mr.ok)
          PrintFormat("[FM_EA] BE #%d %s", mine[i].ticket, mr.reason);
-      if(g_pos.MaybeTrail(mine[i], true, mr) && mr.ok)
+      if(g_pos.MaybeTrail(mine[i], allowTrail, mr) && mr.ok)
          PrintFormat("[FM_EA] TRAIL #%d %s", mine[i].ticket, mr.reason);
      }
    double closedProfits[];
-   int nClosed = g_pos.ScanClosedDeals(closedProfits);
+   int nClosed = g_pos.ScanClosedDeals(closedProfits, _Symbol);
    for(int i = 0; i < nClosed; i++)
      {
       g_risk.NotifyTradeClosed(closedProfits[i]);
@@ -422,7 +464,10 @@ void OnTick()
               {
                string ctxName = CMarketState::StateName(res.mstate.state);
                if(g_paper.Open(_Symbol, ti, rd.volume, rd.riskMoney, px, res.barTime, ctxName))
+                 {
+                  g_risk.NotifyTradeOpened();   // paper fills count toward InpMaxTradesDay too
                   intentTxt += StringFormat(" PAPER_OPEN ctx=%s", ctxName);
+                 }
                else
                   intentTxt += " PAPER_FULL";
               }

@@ -122,8 +122,8 @@ throttled (60 s cooldown except CONFIRMED). No per-tick repeats.
 ## Limitations
 
 - All engines (v1 core, v1.1 fixes, v1.2 families, v2 tooling, bar-by-bar
-  Phases 1–8, LTF confirm) are implemented and mirror-tested (97 Python
-  tests, all pass), but live statistical validation is still pending — see
+  Phases 1–8, LTF confirm) are implemented and mirror-tested (Python mirror
+  suites, all pass in CI), but live statistical validation is still pending — see
   roadmap before any live use.
 - Context (Trend/Range/Transition) defaults to LOG_ONLY — it annotates, never
   vetoes, faithful to Brooks "context, not trigger". MTF/LTF overlays and the

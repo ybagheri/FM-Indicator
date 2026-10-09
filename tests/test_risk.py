@@ -40,19 +40,33 @@ def test_volume_norm():
     check_n("clamp_min", norm_vol(0.001, 0.01, 100.0, 0.01) == 0.01)
     check_n("clamp_max", norm_vol(500.0, 0.01, 100.0, 0.01) == 100.0)
     check_n("sized", size_volume(100.0, 50.0, 0.01, 100.0, 0.01) == 2.0)
-    check_n("sized_min", size_volume(0.0, 50.0, 0.01, 100.0, 0.01) == 0.01)
+    # risk budget <= 0 must mean "do not trade", NOT the minimum lot
+    check_n("zero_risk_rejects", size_volume(0.0, 50.0, 0.01, 100.0, 0.01) == 0.0)
+    check_n("neg_risk_rejects", size_volume(-5.0, 50.0, 0.01, 100.0, 0.01) == 0.0)
+    # IEEE-754 floor regression: 0.29/0.01 == 28.999999999999996
+    check_n("fp_029", norm_vol(0.29, 0.01, 100.0, 0.01) == 0.29)
+    check_n("fp_057", norm_vol(0.57, 0.01, 100.0, 0.01) == 0.57)
+    check_n("fp_115", norm_vol(1.15, 0.01, 100.0, 0.01) == 1.15)
 
 
 def test_daybook():
     b = DayBook()
     b.new_day(20251103)
-    b.closed(-50.0)
-    b.closed(-30.0)
+    b.opened(); b.closed(-50.0)
+    b.opened(); b.closed(-30.0)
+    # one open + one close == ONE trade (was double-counted as 2)
     check_n("consec2", b.consec == 2 and b.trades == 2 and b.pl == -80.0)
-    b.closed(10.0)
+    b.opened(); b.closed(10.0)
     check_n("win_resets", b.consec == 0 and b.trades == 3)
     b.new_day(20251103)
     check_n("same_day_keeps", b.trades == 3)
+    # InpMaxTradesDay=5 must allow exactly 5 open/close trades
+    c = DayBook(); c.new_day(20251105)
+    for _ in range(4):
+        c.opened(); c.closed(1.0)
+    check_n("fifth_trade_allowed", check(True, 2.0, CFG, dict(ST, trades=c.trades))[1] == "OK")
+    c.opened(); c.closed(1.0)
+    check_n("sixth_trade_blocked", check(True, 2.0, CFG, dict(ST, trades=c.trades))[1] == "MAX_TRADES_DAY")
     b.new_day(20251104)
     check_n("rollover_resets", b.trades == 0 and b.pl == 0.0)
 

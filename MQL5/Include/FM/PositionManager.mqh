@@ -325,7 +325,9 @@ public:
    // RESTART RULE: the first scan only fast-forwards the cursor (history
    // before EA start is never replayed into daily P/L); open positions are
    // adopted via Refresh() instead.
-   int               ScanClosedDeals(double &profits[])
+   // sym != "" restricts accounting to deals of that symbol (several charts
+   // may share one magic; without it each instance books the others' P/L).
+   int               ScanClosedDeals(double &profits[], const string sym = "")
      {
       ArrayResize(profits, 0);
       HistorySelect(0, TimeCurrent() + 86400);
@@ -348,6 +350,8 @@ public:
             continue;
          m_lastDealScanned = dt;
          if(HistoryDealGetInteger(dt, DEAL_MAGIC) != m_magic)
+            continue;
+         if(sym != "" && HistoryDealGetString(dt, DEAL_SYMBOL) != sym)
             continue;
          long entry = HistoryDealGetInteger(dt, DEAL_ENTRY);
          if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_INOUT)
